@@ -1,0 +1,6 @@
+import("rtt_ros")
+ros.import("cart_opt_ctrl")
+loadComponent("CartOptCtrl","lwr::CartOptCtrl")
+setActivity("CartOptCtrl",0.001,LowestPriority,ORO_SCHED_RT)
+connectPeers("CartOptCtrl","lwr")
+CartOptCtrl.configure()

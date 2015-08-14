@@ -1,0 +1,7 @@
+// Start LWR
+import("rtt_ros")
+ros.import("rtt_rospack")
+runScript(ros.find("lwr_fri")+"/runfri.ops")
+// Start cart_opt_ctrl
+runScript(ros.find("cart_opt_ctrl")+"/scripts/run_hw.ops")
+CartOptCtrl.start()
