@@ -25,28 +25,34 @@ public:
     env_(),
     model_(env_),
     n_dof_(Ndof),
-    tau_v_(Ndof),
-    qdd_v_(Ndof),
     obj_lin_(0),
     obj_quad_(0),
     ma_b_(Ndof),
     initialized_(false),
-    dynamics_constr_(Ndof)
+    dynamics_constr_(Ndof),
+    dynamics_constr_added_(Ndof,false)
     {
         Q_.setZero();
         q_.setZero();
+        torque_out_.setZero();
+        qdd_out_.setZero();
+        addVars();
         setVerbose(false);
     }
     virtual ~CartOptSolver(){}
     
-    void setVerbose(bool v)
+    void setMethod(const int i)
+    {
+        model_.getEnv().set(GRB_IntParam_Method, i);
+    }
+    
+    void setVerbose(const bool v)
     {
         model_.getEnv().set(GRB_IntParam_OutputFlag, (v?1:0));
     }
     void setTimeLimit(const double& t)
     {
-        if(t>0.)
-            model_.getEnv().set(GRB_DoubleParam_TimeLimit,t);
+        model_.getEnv().set(GRB_DoubleParam_TimeLimit,t);
     }
     void setBarrierConvergeanceTolerance(const double& t)
     {
@@ -61,6 +67,18 @@ public:
         tau_max_ = tau_max;
         qdd_min_ = qdd_min;
         qdd_max_ = qdd_max;
+    }
+    template<class T1,class T2>
+    void setLastSolution(T1& torque_out,
+                            T2& qdd_out
+                            )
+    {
+        //Does not work for QP problems
+        for(unsigned int i=0;i<Ndof;++i)
+        {
+            tau_v_[i].set(GRB_DoubleAttr_PStart,static_cast<double>(torque_out[i]));
+            qdd_v_[i].set(GRB_DoubleAttr_PStart,static_cast<double>(qdd_out[i]));
+        }
     }
     
     template<class T1,class T2>
@@ -77,16 +95,21 @@ public:
         updateBounds();
         updateObjData(jacobian,mass,jdot_qdot,coriolis,gravity,xdd_des);
         updateObj();
-        updateDynamicsData(mass,coriolis,gravity);
-        updateDynamicsConstr();
+        updateDynamicsConstr(mass,b_qqd_);
+        
+        //setLastSolution(torque_out_,qdd_out_);
+        
         try{
             // Find the solution
             model_.optimize();
-            
             // Write solution to VectorXd
-            getTorque(torque_out);
-            getQdd(qdd_out);
-            removeData();
+            
+            getTorque(torque_out_);
+            torque_out = torque_out_;
+            
+            getQdd(qdd_out_);
+            qdd_out = qdd_out_;
+            //removeDynamicsConstr();
             
         } catch(GRBException e) {
             std::cout << "Error code = " << e.getErrorCode() << std::endl;
@@ -112,55 +135,54 @@ private:
         for(unsigned int i=0;i<Ndof && i<qdd.rows();++i)
             qdd[i] = qdd_v_[i].get(GRB_DoubleAttr_X);
     }
-    void updateBounds()
-    {     
-        addVars(tau_v_,tau_min_,tau_max_);
-        addVars(qdd_v_,qdd_min_,qdd_max_);
-        model_.update();
-    }
-    void updateDynamicsData(const Eigen::Matrix<double,Ndof,Ndof>& mass,
-			   const Eigen::Matrix<double,Ndof,1>& coriolis,
-			   const Eigen::Matrix<double,Ndof,1>& gravity)
-    {
-	for(unsigned int i=0;i<Ndof;++i){
-		ma_b_[i] = 0;
-		for(unsigned int j=0;j<Ndof;++j){
-                        ma_b_[i] += mass(i,j) * qdd_v_[j];
-		}
-		ma_b_[i] += coriolis[i] + gravity[i];
-	}	
-    }
-    void updateDynamicsConstr()
+    void updateBound(const Eigen::Matrix<double,Ndof,1>& min,
+                     const Eigen::Matrix<double,Ndof,1>& max,
+                     GRBVar * vars)
     {
         for(unsigned int i=0;i<Ndof;++i)
-            dynamics_constr_[i] = model_.addConstr(ma_b_[i] == tau_v_[i]);
-    }
-    
-    void removeData()
-    {
-        for(unsigned int i=0;i<Ndof;++i){
-                model_.remove(dynamics_constr_[i]);
-                model_.remove(tau_v_[i]);
-                model_.remove(qdd_v_[i]);
+        {
+            vars[i].set(GRB_DoubleAttr_LB,min[i]);
+            vars[i].set(GRB_DoubleAttr_UB,max[i]);
         }
     }
-    
-    void resetModel()
-    {
-        model_.reset();
+    void updateBounds()
+    {     
+        updateBound(tau_min_,tau_max_,tau_v_);
+        updateBound(qdd_min_,qdd_max_,qdd_v_);
     }
-    void addVars(std::vector<GRBVar>& vars, 
-                 const Eigen::Matrix< double, Ndof, 1  >& min,
-                 const Eigen::Matrix< double, Ndof, 1  >& max   /*,
-                 const std::string& name,
-                 const Eigen::Matrix< double, Ndof, 1  > obj = Eigen::Matrix< double, Ndof, 1  >::Zero(),
-                 const std::vector<char> type = std::vector<char>(Ndof,GRB_CONTINUOUS)*/)
+    void updateDynamicsConstr(const Eigen::Matrix<double,Ndof,Ndof>& mass,
+			   const Eigen::Matrix<double,Ndof,1>& b_qqd)
     {
-        for(unsigned int i=0;i<Ndof;++i)
-            vars[i] = model_.addVar(min[i],max[i],0,GRB_CONTINUOUS);//obj[i],type[i],name+"_"+to_string(i));
-        //model_.update();
+	for(unsigned int i=0;i<Ndof;++i)
+        {
+            // M(q).qdd + b(q,qd) = T => M(q).qdd - T = -b(q,qd)
+            
+            if(!dynamics_constr_added_[i])
+            {
+                M_qdd = 0;
+                for(unsigned int j=0;j<Ndof;++j)
+                    M_qdd += mass(i,j)*qdd_v_[j];
+                dynamics_constr_[i] = model_.addConstr(M_qdd - tau_v_[i] == -b_qqd[i]);
+                dynamics_constr_added_[i] = true;
+            }else{
+                for(unsigned int j=0;j<Ndof;++j)
+                    model_.chgCoeff(dynamics_constr_[i],qdd_v_[j],mass(i,j));
+                dynamics_constr_[i].set(GRB_DoubleAttr_RHS,-b_qqd[i]);
+            }
+        }
     }
-    
+
+    void addVars()
+    {
+        tau_v_ = model_.addVars(Ndof);
+        qdd_v_ = model_.addVars(Ndof);
+        model_.update();
+        for(unsigned int i=0;i<Ndof;++i){
+            tau_v_[i].set(GRB_StringAttr_VarName,"tau_"+to_string(i));
+            qdd_v_[i].set(GRB_StringAttr_VarName,"qdd_"+to_string(i));
+        }
+        model_.update();
+    } 
     void updateObjData(	const Eigen::Matrix<double,6,Ndof>& jacobian,
 		    	const Eigen::Matrix<double,Ndof,Ndof>& mass,
 		    	const Eigen::Matrix<double,6,1>& jdot_qdot,
@@ -170,7 +192,8 @@ private:
     {
         mass_inv_ = mass.inverse();
         a_ = jacobian * mass_inv_;
-        cte_ = jdot_qdot.transpose() - (a_ * (coriolis + gravity)).transpose() - xdd_des.transpose();
+        b_qqd_ = coriolis + gravity;
+        cte_ = jdot_qdot.transpose() - (a_ * b_qqd_).transpose() - xdd_des.transpose();
         q_ = 2. * (cte_  * a_);
         Q_ = a_.transpose() * a_;
 
@@ -187,7 +210,6 @@ private:
         }
         lin_cte_ = cte_ * cte_.transpose();
 	model_.setObjective(obj_quad_ + obj_lin_ + lin_cte_,GRB_MINIMIZE);
-	//model_.update();
         return true;
     }
 private:
@@ -201,17 +223,24 @@ private:
     
     std::vector<GRBConstr> dynamics_constr_;
     
+    std::vector<bool> dynamics_constr_added_;
+    
     GRBLinExpr obj_lin_;
     
     GRBQuadExpr obj_quad_;
     
-    std::vector<GRBVar> tau_v_,
-                        qdd_v_;
+    GRBVar * tau_v_;
+    
+    GRBVar * qdd_v_;
                         
     Eigen::Matrix< double, Ndof, 1 > tau_min_,tau_max_,
-                                     qdd_min_,qdd_max_;
+                                     qdd_min_,qdd_max_,
+                                     torque_out_,qdd_out_,
+                                     b_qqd_;
                         
-    std::vector<GRBLinExpr>     ma_b_;                        
+    std::vector<GRBLinExpr>     ma_b_;
+    
+    GRBLinExpr M_qdd;
                                 
     Eigen::Matrix<double,6,Ndof> a_;
     
