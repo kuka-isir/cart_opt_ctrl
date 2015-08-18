@@ -5,6 +5,9 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 set(CMAKE_BUILD_TYPE ReleaseWithDebugInfo)
 
+#find_package(Ceres REQUIRED)
+#include_directories(${CERES_INCLUDE_DIRS})
+
 find_package(GUROBI REQUIRED)
 include_directories(${GUROBI_INCLUDE_DIRS})
 
@@ -41,6 +44,9 @@ include_directories(
 
 orocos_component(${PROJECT_NAME} src/${PROJECT_NAME}.cpp)
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMPONENT)
+if($ENV{OROCOS_TARGET} STREQUAL "xenomai" )
+  set_property(TARGET ${library_name} APPEND PROPERTY COMPILE_DEFINITIONS __XENOMAI__)
+endif()
 
 # Just for Hydro compatibility
 list(REMOVE_ITEM catkin_LIBRARIES lwr_fri_generate_messages_cpp)
@@ -54,6 +60,7 @@ target_link_libraries(${PROJECT_NAME}
     ${kdl_conversions_LIBRARIES}
     ${Boost_LIBRARIES}
     ${GUROBI_LIBRARIES}
+    #${CERES_LIBRARIES}
 )
 
 orocos_install_headers(DIRECTORY include/${PROJECT_NAME})
