@@ -223,7 +223,7 @@ void CartOptCtrl::publishTrajectory()
 void CartOptCtrl::updateHook()
 {
     ros::Time t_start = rtt_rosclock::host_now();
-    publishTrajectory();
+    //publishTrajectory();
     
     log(Debug) << "Start" << endlog();
     if(!updateState() || !getMassMatrix(mass) || !traj_computed)
