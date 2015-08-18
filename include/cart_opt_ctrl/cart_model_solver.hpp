@@ -38,7 +38,9 @@ public:
         qdd_out_.setZero();
         addVars();
         setVerbose(false);
+        
     }
+    
     virtual ~CartOptSolver(){}
     
     void setMethod(const int i)
@@ -101,7 +103,13 @@ public:
         
         try{
             // Find the solution
-            model_.optimize();
+            model_.optimizeasync();
+            int rc = pthread_create(&th_, NULL, 
+                    &CartOptSolver::sync,&model_);
+            if (rc){
+                std::cerr << "Error:unable to create thread," << rc << std::endl;
+            }
+            pthread_join(th_,NULL);
             // Write solution to VectorXd
             
             getTorque(torque_out_);
@@ -109,20 +117,24 @@ public:
             
             getQdd(qdd_out_);
             qdd_out = qdd_out_;
-            //removeDynamicsConstr();
             
         } catch(GRBException e) {
-            std::cout << "Error code = " << e.getErrorCode() << std::endl;
-            std::cout << e.getMessage() << std::endl;
+            std::cerr << "Error code = " << e.getErrorCode() << std::endl;
+            std::cerr << e.getMessage() << std::endl;
             return false;
         } catch(...) {
-            std::cout << "Exception during optimization" << std::endl;
+            std::cerr << "Exception during optimization" << std::endl;
             return false;
         }
         return true;
     }
 
 private:
+    static void * sync(void * model)
+    {
+        static_cast<GRBModel*>(model)->sync();
+        pthread_exit(NULL);
+    }
     template<class T>
     void getTorque(T& torque)
     {
@@ -252,6 +264,8 @@ private:
     Eigen::Matrix<double,1,Ndof> q_;
            
     double lin_cte_;
+    
+    pthread_t th_;
  
 };
 }
