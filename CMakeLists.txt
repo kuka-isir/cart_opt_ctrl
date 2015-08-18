@@ -45,7 +45,7 @@ include_directories(
 orocos_component(${PROJECT_NAME} src/${PROJECT_NAME}.cpp)
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMPONENT)
 if($ENV{OROCOS_TARGET} STREQUAL "xenomai" )
-  set_property(TARGET ${library_name} APPEND PROPERTY COMPILE_DEFINITIONS __XENOMAI__)
+  set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS __XENOMAI__)
 endif()
 
 # Just for Hydro compatibility
