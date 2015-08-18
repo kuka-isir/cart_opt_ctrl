@@ -1,7 +1,7 @@
 import("rtt_ros")
 ros.import("cart_opt_ctrl")
 loadComponent("CartOptCtrl","lwr::CartOptCtrl")
-setActivity("CartOptCtrl",0.001,LowestPriority,ORO_SCHED_RT)
+setActivity("CartOptCtrl",0.003,LowestPriority,ORO_SCHED_RT)
 connectPeers("CartOptCtrl","lwr_sim")
 
 
