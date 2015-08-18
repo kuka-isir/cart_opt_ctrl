@@ -69,6 +69,7 @@ namespace lwr{
       void setSolverVerbose(bool v);
       void setSolverTimeLimit(double t);
       void setSolverBarrierConvergeanceTolerance(double t);
+      void setSolverMethod(int i);
       RTT::OutputPort<geometry_msgs::PoseStamped> port_X_curr;
       RTT::OutputPort<geometry_msgs::PoseStamped> port_X_des;
       RTT::OutputPort<geometry_msgs::PoseStamped> port_X_tmp;

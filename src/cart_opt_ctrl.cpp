@@ -48,6 +48,7 @@ RTTLWRAbstract(name)
     this->addAttribute("use_xd_des",use_xd_des_);
     this->addAttribute("use_xdd_des",use_xdd_des_);
     this->addAttribute("ReadyToStart",ready_to_start_);
+    this->addOperation("setSolverMethod",&CartOptCtrl::setSolverMethod,this,RTT::OwnThread);
     this->addOperation("setSolverVerbose",&CartOptCtrl::setSolverVerbose,this,RTT::OwnThread);
     this->addOperation("setSolverTimeLimit",&CartOptCtrl::setSolverTimeLimit,this,RTT::OwnThread);
     this->addOperation("setSolverBarrierConvergeanceTolerance",&CartOptCtrl::setSolverBarrierConvergeanceTolerance,this,RTT::OwnThread);
@@ -58,6 +59,11 @@ RTTLWRAbstract(name)
     this->addAttribute("use_mass_sqrt",use_mass_sqrt_);
     this->addAttribute("use_ft_sensor",use_ft_sensor_);
 }
+void CartOptCtrl::setSolverMethod(int i)
+{
+    cart_model_solver_.setMethod(i);
+}
+
 void CartOptCtrl::setSolverBarrierConvergeanceTolerance(double t)
 {
     cart_model_solver_.setBarrierConvergeanceTolerance(t);
@@ -306,7 +312,8 @@ void CartOptCtrl::updateHook()
 #endif
         cart_model_solver_.optimize(jnt_pos,
                                     jnt_vel,
-                                    5.*static_cast<double>(getPeriod()),
+                                    
+                                    3.*static_cast<double>(getPeriod()),
                                     J_ati_base.data,
                                     mass_kdl.data,
                                     jdot_qdot_,
