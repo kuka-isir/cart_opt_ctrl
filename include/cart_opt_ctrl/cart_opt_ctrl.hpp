@@ -47,7 +47,7 @@
 #include <unsupported/Eigen/MatrixFunctions>
 #include <geometry_msgs/WrenchStamped.h>
 #include <geometry_msgs/PoseArray.h>
-#include <std_msgs/Float32.h>
+#include <std_msgs/Float64.h>
 #include <std_msgs/Float32MultiArray.h>
 
 template <typename T>
@@ -70,18 +70,33 @@ namespace lwr{
       void setSolverTimeLimit(double t);
       void setSolverBarrierConvergeanceTolerance(double t);
       void setSolverMethod(int i);
+      static void * optimize(void * arg);
       RTT::OutputPort<geometry_msgs::PoseStamped> port_X_curr;
       RTT::OutputPort<geometry_msgs::PoseStamped> port_X_des;
       RTT::OutputPort<geometry_msgs::PoseStamped> port_X_tmp;
       RTT::OutputPort<geometry_msgs::PoseArray> port_pose_array;
       RTT::InputPort<geometry_msgs::WrenchStamped> port_ftdata;
-      RTT::OutputPort<std_msgs::Float32> port_solver_duration;
+      RTT::OutputPort<std_msgs::Float64> port_solver_duration;
+      RTT::OutputPort<std_msgs::Float64> port_loop_duration;
       RTT::OutputPort<nav_msgs::Path> port_path_ros;
       RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_min;
       RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_max;
       RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_des;
         
+      // Async update
+      RTT::OutputPort<Eigen::VectorXd> port_q;
+      RTT::OutputPort<Eigen::VectorXd> port_qdot;
+      RTT::OutputPort<double> port_dt;
+      RTT::OutputPort<Eigen::MatrixXd> port_jacobian;
+      RTT::OutputPort<Eigen::MatrixXd> port_mass;
+      RTT::OutputPort<Eigen::VectorXd> port_jdot_qdot;
+      RTT::OutputPort<Eigen::VectorXd> port_coriolis;
+      RTT::OutputPort<Eigen::VectorXd> port_gravity;
+      RTT::OutputPort<Eigen::VectorXd> port_xdd_des;
+      RTT::OutputPort<bool> port_optimize_event;
+
     protected:
+      double kdt_;
       std_msgs::Float32MultiArray qdd_min_ros,qdd_max_ros,qdd_des_ros;
       geometry_msgs::PoseStamped X_curr_msg,X_des_msg,X_tmp_msg;
       bool ready_to_start_;
@@ -102,15 +117,12 @@ namespace lwr{
       KDL::Trajectory_Composite* ctraject;
       void publishTrajectory();
       boost::scoped_ptr<KDL::ChainJntToJacDotSolver> jdot_solver;
-      boost::scoped_ptr<KDL::ChainIkSolverVel_wdls> wdls_solver;
       KDL::Jacobian jdot,J_ati_base,J_ee_base;
       KDL::Twist jdot_qdot;
       double t_traj_curr;
 
       Eigen::Matrix<double,7,1> jnt_pos_eigen;
       Eigen::Matrix<double,7,1> corr_cart;
-
-      boost::scoped_ptr<KDL::ChainIkSolverVel_pinv> pinv_solver;
 
       double kp_lin,kd_lin,kp_ang,kd_ang;
       KDL::JntArray qdd_des_kdl;
@@ -130,11 +142,129 @@ namespace lwr{
       geometry_msgs::WrenchStamped ft_data;
       Eigen::Matrix<double,6,1> ft_wrench;
       KDL::Wrench ft_wrench_kdl;
-      lwr::LWRCartOptSolver cart_model_solver_;
+      Eigen::Matrix<double,6,1> xdd_des_;
+      Eigen::Matrix<double,6,1> jdot_qdot_;
+      //lwr::LWRCartOptSolver cart_model_solver_;
 private:
       bool model_verbose_;
       double solver_duration;
   };
 }
-ORO_CREATE_COMPONENT(lwr::CartOptCtrl)
+namespace gurobi{
+class RTTCartOptSolver: public RTT::TaskContext
+{
+public:
+      RTTCartOptSolver(const std::string& name): RTT::TaskContext(name)
+      {
+            this->addPort("q",port_q).doc("");
+            this->addPort("qdot",port_qdot).doc("");
+            this->addPort("jac",port_jacobian).doc("");
+            this->addPort("mass",port_mass).doc("");
+            this->addPort("dt",port_dt).doc("");
+            this->addPort("jdot_qdot",port_jdot_qdot).doc("");
+            this->addPort("coriolis",port_coriolis).doc("");
+            this->addPort("gravity",port_gravity).doc("");
+            this->addPort("xdd_des",port_xdd_des).doc("");
+            this->addPort("torque_out",port_torque_out).doc("");
+            this->ports()->addEventPort( "optimize", port_optimize_event ).doc( "" );
+      }
+      bool configureHook()
+      {
+            q.resize(Ndof);
+            qdot.resize(Ndof);
+            jacobian.resize(Ndof,Ndof);
+            mass.resize(Ndof,Ndof);
+            jdot_qdot.resize(6);
+            coriolis.resize(Ndof);
+            gravity.resize(Ndof);
+            xdd_des.resize(6);
+            torque_out.resize(Ndof);
+
+            torque_out.setZero();
+            q.setZero();
+            qdot.setZero();
+            jacobian.setZero();
+            mass.setZero();
+            jdot_qdot.setZero();
+            coriolis.setZero();
+            gravity.setZero();
+            xdd_des.setZero();
+            
+            port_optimize_time.createStream(rtt_roscomm::topic("~"+this->getName()+"/optimize_time"));
+            return true;
+      }
+
+      void updateHook()
+      {
+            gettimeofday(&tbegin,NULL);
+
+            RTT::FlowStatus fs = port_q.read(q);
+            if(fs == RTT::NoData){
+                  usleep(250.0);
+                  RTT::log(RTT::Error) << "NoData" << RTT::endlog();
+            }else{
+                  port_qdot.read(qdot);
+                  port_jacobian.read(jacobian);
+                  port_mass.read(mass);
+                  port_dt.read(dt);
+                  port_jdot_qdot.read(jdot_qdot);
+                  port_coriolis.read(coriolis);
+                  port_gravity.read(gravity);
+                  port_xdd_des.read(xdd_des);
+
+                  cart_model_solver_.update(q,qdot,dt,
+                        jacobian,mass,jdot_qdot,
+                        coriolis,gravity,xdd_des);
+                  
+
+                  cart_model_solver_.optimize();
+                  cart_model_solver_.getTorque(torque_out);
+
+                  torque_out-=gravity;
+
+                  port_torque_out.write(torque_out);
+            }
+            gettimeofday(&tend,NULL);
+
+            elapsed_ros.data = 1000.*(tend.tv_sec-tbegin.tv_sec)+(tend.tv_usec-tbegin.tv_usec)/1000.;
+            port_optimize_time.write(elapsed_ros);
+            //this->trigger();
+      }
+
+      RTT::InputPort<Eigen::VectorXd> port_q;
+      RTT::InputPort<Eigen::VectorXd> port_qdot;
+      RTT::InputPort<double> port_dt;
+      RTT::InputPort<Eigen::MatrixXd> port_jacobian;
+      RTT::InputPort<Eigen::MatrixXd> port_mass;
+      RTT::InputPort<Eigen::VectorXd> port_jdot_qdot;
+      RTT::InputPort<Eigen::VectorXd> port_coriolis;
+      RTT::InputPort<Eigen::VectorXd> port_gravity;
+      RTT::InputPort<Eigen::VectorXd> port_xdd_des;
+      RTT::OutputPort<Eigen::VectorXd> port_torque_out;
+      RTT::OutputPort<std_msgs::Float64> port_optimize_time;
+      RTT::InputPort<bool> port_optimize_event;
+
+      struct timeval tbegin,tend;
+      Eigen::VectorXd torque_out;
+      Eigen::VectorXd q;
+      Eigen::VectorXd qdot;
+      double dt;
+      Eigen::MatrixXd jacobian;
+      Eigen::MatrixXd mass;
+      Eigen::VectorXd jdot_qdot;
+      Eigen::VectorXd coriolis;
+      Eigen::VectorXd gravity;
+      Eigen::VectorXd xdd_des;
+      ros::Time start_t;
+      std_msgs::Float64 elapsed_ros;
+
+protected:
+      lwr::LWRCartOptSolver cart_model_solver_;
+
+};
+
+}
+ORO_LIST_COMPONENT_TYPE(lwr::CartOptCtrl)
+ORO_LIST_COMPONENT_TYPE(gurobi::RTTCartOptSolver)
+ORO_CREATE_COMPONENT_LIBRARY()
 #endif

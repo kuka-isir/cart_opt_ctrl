@@ -4,7 +4,6 @@
 #include "gurobi_c++.h"
 #include <boost/shared_ptr.hpp>
 #include <Eigen/Dense>
-
 #include <sstream>
 
 #define to_string( x ) dynamic_cast< std::ostringstream & >( \
@@ -38,7 +37,6 @@ public:
         qdd_out_.setZero();
         addVars();
         setVerbose(false);
-        
     }
     
     virtual ~CartOptSolver(){}
@@ -83,41 +81,27 @@ public:
         }
     }
     
-    template<class T1,class T2>
-    bool optimize(const Eigen::Matrix<double,6,Ndof>& jacobian,
+    void update(const Eigen::Matrix<double,6,Ndof>& jacobian,
                   const Eigen::Matrix<double,Ndof,Ndof>& mass,
                   const Eigen::Matrix<double,6,1>& jdot_qdot,
                   const Eigen::Matrix<double,Ndof,1>& coriolis,
                   const Eigen::Matrix<double,Ndof,1>& gravity,
-                  const Eigen::Matrix<double,6,1>& xdd_des,
-                  T1& torque_out,
-                  T2& qdd_out
+                  const Eigen::Matrix<double,6,1>& xdd_des
                   )
     {
         updateBounds();
         updateObjData(jacobian,mass,jdot_qdot,coriolis,gravity,xdd_des);
         updateObj();
         updateDynamicsConstr(mass,b_qqd_);
-        
-        //setLastSolution(torque_out_,qdd_out_);
-        
+	    model_.update();        
+    }
+
+    bool optimize(){
         try{
-            // Find the solution
-            model_.optimizeasync();
-            int rc = pthread_create(&th_, NULL, 
-                    &CartOptSolver::sync,&model_);
-            if (rc){
-                std::cerr << "Error:unable to create thread," << rc << std::endl;
-            }
-            pthread_join(th_,NULL);
-            // Write solution to VectorXd
-            
+            model_.optimize();
             getTorque(torque_out_);
-            torque_out = torque_out_;
-            
             getQdd(qdd_out_);
-            qdd_out = qdd_out_;
-            
+
         } catch(GRBException e) {
             std::cerr << "Error code = " << e.getErrorCode() << std::endl;
             std::cerr << e.getMessage() << std::endl;
@@ -129,24 +113,27 @@ public:
         return true;
     }
 
+    template<class T> void getTorque(T& torque)
+    {
+        try{
+            for(unsigned int i=0;i<Ndof && i<torque.rows();++i)
+                torque[i] = tau_v_[i].get(GRB_DoubleAttr_X);
+        } catch(GRBException e) {}
+    }
+
+    template<class T> void getQdd(T& qdd)
+    {
+        try{
+            for(unsigned int i=0;i<Ndof && i<qdd.rows();++i)
+                qdd[i] = qdd_v_[i].get(GRB_DoubleAttr_X);
+        } catch(GRBException e) {}
+    }
+    static void * optimizeasync(void * model)
+    {
+        reinterpret_cast<GRBModel*>(model)->optimize();
+    }
 private:
-    static void * sync(void * model)
-    {
-        static_cast<GRBModel*>(model)->sync();
-        pthread_exit(NULL);
-    }
-    template<class T>
-    void getTorque(T& torque)
-    {
-        for(unsigned int i=0;i<Ndof && i<torque.rows();++i)
-            torque[i] = tau_v_[i].get(GRB_DoubleAttr_X);
-    }
-    template<class T>
-    void getQdd(T& qdd)
-    {
-        for(unsigned int i=0;i<Ndof && i<qdd.rows();++i)
-            qdd[i] = qdd_v_[i].get(GRB_DoubleAttr_X);
-    }
+
     void updateBound(const Eigen::Matrix<double,Ndof,1>& min,
                      const Eigen::Matrix<double,Ndof,1>& max,
                      GRBVar * vars)
@@ -157,11 +144,13 @@ private:
             vars[i].set(GRB_DoubleAttr_UB,max[i]);
         }
     }
+
     void updateBounds()
     {     
         updateBound(tau_min_,tau_max_,tau_v_);
         updateBound(qdd_min_,qdd_max_,qdd_v_);
     }
+
     void updateDynamicsConstr(const Eigen::Matrix<double,Ndof,Ndof>& mass,
 			   const Eigen::Matrix<double,Ndof,1>& b_qqd)
     {
@@ -195,6 +184,7 @@ private:
         }
         model_.update();
     } 
+
     void updateObjData(	const Eigen::Matrix<double,6,Ndof>& jacobian,
 		    	const Eigen::Matrix<double,Ndof,Ndof>& mass,
 		    	const Eigen::Matrix<double,6,1>& jdot_qdot,
@@ -210,6 +200,7 @@ private:
         Q_ = a_.transpose() * a_;
 
     }
+    
     bool updateObj()
     {
         obj_quad_ = 0;
@@ -284,7 +275,7 @@ public:
         toRad(q_lim_);
         toRad(qdot_lim_);
     }
-    bool optimize(const Eigen::Matrix<double,Ndof,1>& q,
+    void update(const Eigen::Matrix<double,Ndof,1>& q,
                 const Eigen::Matrix<double,Ndof,1>& qdot,
                 const double& dt_sec_since_last_optimize,
                 const Eigen::Matrix<double,6,Ndof>& jacobian,
@@ -292,13 +283,13 @@ public:
                 const Eigen::Matrix<double,6,1>& jdot_qdot,
                 const Eigen::Matrix<double,Ndof,1>& coriolis,
                 const Eigen::Matrix<double,Ndof,1>& gravity,
-                const Eigen::Matrix<double,6,1>& xdd_des,
-                Eigen::VectorXd& torque_out
+                const Eigen::Matrix<double,6,1>& xdd_des
                 )
     {
         updateBounds(q,qdot,dt_sec_since_last_optimize,gravity);
-        return gurobi::CartOptSolver::optimize(jacobian,mass,jdot_qdot,coriolis,gravity,xdd_des,torque_out,lwr_qdd_des_);
+        gurobi::CartOptSolver::update(jacobian,mass,jdot_qdot,coriolis,gravity,xdd_des);
     }
+    //bool optimize(){return gurobi::CartOptSolver::optimise();}
     template<class T_Array,class T2_Array,class T3_Array>
     void getQddBounds(  T_Array& qdd_min, 
                         T2_Array& qdd_max,
