@@ -3,7 +3,7 @@ project(cart_opt_ctrl)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-set(CMAKE_BUILD_TYPE ReleaseWithDebugInfo)
+set(CMAKE_BUILD_TYPE Release)
 
 #find_package(Ceres REQUIRED)
 #include_directories(${CERES_INCLUDE_DIRS})
@@ -25,7 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Eigen REQUIRED)
 find_package(orocos_kdl REQUIRED)
-find_package(Boost REQUIRED)
+#find_package(Boost REQUIRED system)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -44,7 +44,9 @@ include_directories(
 
 orocos_component(${PROJECT_NAME} src/${PROJECT_NAME}.cpp)
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMPONENT)
-if($ENV{OROCOS_TARGET} STREQUAL "xenomai" )
+if($ENV{OROCOS_TARGET} STREQUAL "xenomai")
+  #find_package(Xenomai REQUIRED)
+  #include_directories(${Xenomai_INCLUDE_DIR})
   set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS __XENOMAI__)
 endif()
 
@@ -54,12 +56,15 @@ list(REMOVE_ITEM catkin_LIBRARIES lwr_fri_generate_messages_lisp)
 list(REMOVE_ITEM catkin_LIBRARIES lwr_fri_generate_messages_py)
 
 target_link_libraries(${PROJECT_NAME}
+    #${Xenomai_LIBRARIES}
     ${catkin_LIBRARIES}
-    ${USE_OROCOS_LIBRARIES}
+    
     ${orocos_kdl_LIBRARIES}
     ${kdl_conversions_LIBRARIES}
-    ${Boost_LIBRARIES}
+    #${Boost_LIBRARIES}
     ${GUROBI_LIBRARIES}
+    ${USE_OROCOS_LIBRARIES}
+    #${Xenomai_LIBRARIES}
     #${CERES_LIBRARIES}
 )
 
