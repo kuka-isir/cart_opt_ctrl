@@ -1,10 +1,33 @@
 import("rtt_ros")
 ros.import("cart_opt_ctrl")
-loadComponent("CartOptCtrl","lwr::CartOptCtrl")
-setActivity("CartOptCtrl",0.003,LowestPriority,ORO_SCHED_RT)
-connectPeers("CartOptCtrl","lwr_sim")
 
+loadComponent("CartOptCtrl","lwr::CartOptCtrl")
+loadComponent("GurobiSolver","gurobi::RTTCartOptSolver")
+
+
+
+setActivity("GurobiSolver",0,LowestPriority,ORO_SCHED_OTHER)
+setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
+
+connectPeers("CartOptCtrl","GurobiSolver")
+connectPeers("CartOptCtrl","lwr_sim")
+connectPeers("GurobiSolver","lwr_sim")
+
+var ConnPolicy cp = ConnPolicy()
+
+connect("CartOptCtrl.q","GurobiSolver.q",cp)
+connect("CartOptCtrl.qdot","GurobiSolver.qdot",cp)
+connect("CartOptCtrl.dt","GurobiSolver.dt",cp)
+connect("CartOptCtrl.jac","GurobiSolver.jac",cp)
+connect("CartOptCtrl.mass","GurobiSolver.mass",cp)
+connect("CartOptCtrl.jdot_qdot","GurobiSolver.jdot_qdot",cp)
+connect("CartOptCtrl.coriolis","GurobiSolver.coriolis",cp)
+connect("CartOptCtrl.gravity","GurobiSolver.gravity",cp)
+connect("CartOptCtrl.xdd_des","GurobiSolver.xdd_des",cp)
+connect("CartOptCtrl.optimize","GurobiSolver.optimize",cp)
+connect("GurobiSolver.torque_out","lwr_sim.JointTorqueCommand",cp)
 
 lwr_sim.setInitialJointPosition(array(1.0,0.,0.0,-1.57,0.0,1.57,0.))
 
+GurobiSolver.configure()
 CartOptCtrl.configure()
