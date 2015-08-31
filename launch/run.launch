@@ -38,7 +38,8 @@
     
     <!-- The parameters that the CartOptCtrl sensor will get -->
     <rosparam ns="CartOptCtrl" subst_value="true">
-        debug_mode: true
+        debug_mode: false
+
     </rosparam>
 
 <!--============ LWR Runner script ===============-->  
