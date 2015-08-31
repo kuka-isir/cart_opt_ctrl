@@ -26,12 +26,13 @@ use_xd_des_(true),
 use_ft_sensor_(false),
 model_verbose_(false),
 jacobian_solver_type_(WDL_SOLVER),
+kdt_(5.0),
 RTTLWRAbstract(name)
 {
 //     this->ports()->addPort("PathROS",port_path_ros).doc("");
-    this->ports()->addPort("X_curr",port_X_curr).doc("");
+    /*this->ports()->addPort("X_curr",port_X_curr).doc("");
     this->ports()->addPort("X_tmp",port_X_tmp).doc("");
-    this->ports()->addPort("X_des",port_X_des).doc("");
+    this->ports()->addPort("X_des",port_X_des).doc("");*/
     this->ports()->addPort("FTData",port_ftdata).doc("The ATI F/T Sensor Input");
     this->addOperation("publishTrajectory",&CartOptCtrl::publishTrajectory,this,RTT::OwnThread);
     this->addOperation("computeTrajectory",&CartOptCtrl::computeTrajectory,this,RTT::OwnThread);
@@ -41,6 +42,7 @@ RTTLWRAbstract(name)
     this->addAttribute("kd_ang",kd_ang);
     this->addAttribute("dw_max",dw_max_);
     this->addAttribute("dx_ang",d_ang_max_);
+    this->addAttribute("kdt",kdt_);
     this->addAttribute("debug_mode",debug_mode_);
     this->addAttribute("use_jdot_qdot",use_jdot_qdot_);
     this->addAttribute("use_f_ext",use_f_ext_);
@@ -58,42 +60,51 @@ RTTLWRAbstract(name)
     this->provides("debug")->addAttribute("WrenchInBase",F_ext);
     this->addAttribute("use_mass_sqrt",use_mass_sqrt_);
     this->addAttribute("use_ft_sensor",use_ft_sensor_);
+// Async Optimize
+            this->addPort("q",port_q).doc("");
+            this->addPort("qdot",port_qdot).doc("");
+            this->addPort("jac",port_jacobian).doc("");
+            this->addPort("mass",port_mass).doc("");
+            this->addPort("dt",port_dt).doc("");
+            this->addPort("jdot_qdot",port_jdot_qdot).doc("");
+            this->addPort("coriolis",port_coriolis).doc("");
+            this->addPort("gravity",port_gravity).doc("");
+            this->addPort("xdd_des",port_xdd_des).doc("");
+            this->addPort( "optimize", port_optimize_event ).doc( "" );
 }
 void CartOptCtrl::setSolverMethod(int i)
 {
-    cart_model_solver_.setMethod(i);
+    //cart_model_solver_.setMethod(i);
 }
 
 void CartOptCtrl::setSolverBarrierConvergeanceTolerance(double t)
 {
-    cart_model_solver_.setBarrierConvergeanceTolerance(t);
+    //cart_model_solver_.setBarrierConvergeanceTolerance(t);
 }
 void CartOptCtrl::setSolverTimeLimit(double t)
 {
-    this->cart_model_solver_.setTimeLimit(t);
+    //this->cart_model_solver_.setTimeLimit(t);
 }
 
 void CartOptCtrl::setSolverVerbose(bool v)
 {
-    this->cart_model_solver_.setVerbose(v);
+    //this->cart_model_solver_.setVerbose(v);
 }
 bool CartOptCtrl::configureHook()
 {
     log(Warning) << "Configuring parent" << endlog();
     
-    if(false == RTTLWRAbstract::configureHook())
+    if(false == RTTLWRAbstract::init())
     {
         log(RTT::Fatal) << "Configure parent error" << endlog();
         return false;
     }
+    port_JointTorqueCommand.disconnect();
+    log(Warning) << "Configured" << endlog();
     this->getAllComponentRelative();
 
     log(Warning) << "Configuring ChainJntToJacDotSolver " << endlog();
     jdot_solver.reset(new KDL::ChainJntToJacDotSolver(kdl_chain));
-    log(Warning) << "Configuring ChainIkSolverVel_pinv " << endlog();
-    pinv_solver.reset(new KDL::ChainIkSolverVel_pinv(kdl_chain));
-    log(Warning) << "Configuring ChainIkSolverVel_wdls " << endlog();
-    wdls_solver.reset(new KDL::ChainIkSolverVel_wdls(kdl_chain));
     
     log(Warning) << "Getting state" << endlog();
     int cnt = 10;
@@ -102,6 +113,8 @@ bool CartOptCtrl::configureHook()
         log(Warning) << "Waiting for lwr_fri to publish data " << endlog();
         usleep(5e5);
     }
+    if(!cnt)
+        return false;
     
     log(Warning) << "setJointTorqueControlMode" << endlog();
     setJointTorqueControlMode();
@@ -110,6 +123,8 @@ bool CartOptCtrl::configureHook()
     Xd_cmd.setZero();
     X_err.setZero();
     Xd_err.setZero();
+    
+
     
     port_X_curr.createStream(rtt_roscomm::topic("~"+getName()+"/pos_curr"));
     port_X_tmp.createStream(rtt_roscomm::topic("~"+getName()+"/pos_tmp"));
@@ -121,6 +136,8 @@ bool CartOptCtrl::configureHook()
     port_qdd_min.createStream(rtt_roscomm::topic("~"+getName()+"/qdd_min"));
     port_qdd_des.createStream(rtt_roscomm::topic("~"+getName()+"/qdd_des"));
     
+    port_loop_duration.createStream(rtt_roscomm::topic("~"+getName()+"/loop_duration"));
+
     qdd_min_ros.data.resize(kdl_chain.getNrOfJoints());
     qdd_max_ros.data.resize(kdl_chain.getNrOfJoints());
     qdd_des_ros.data.resize(kdl_chain.getNrOfJoints());
@@ -134,24 +151,43 @@ bool CartOptCtrl::configureHook()
     jdot.resize(kdl_chain.getNrOfSegments());
     J_ati_base.resize(kdl_chain.getNrOfJoints());
     J_ee_base.resize(kdl_chain.getNrOfJoints());
-    // Get initial pose
-    getCartesianPosition(cart_pos);
-    
-    computeTrajectory(0.01,0.05,0.05,0.2);   
+    // Get initial pose   
      
     mass_inv.resize(kdl_chain.getNrOfJoints(),kdl_chain.getNrOfJoints());
     
+    port_qdot.setDataSample(jnt_pos);
+    port_jacobian.setDataSample(J_ati_base.data);
+    port_mass.setDataSample(mass_kdl.data);
+    port_jdot_qdot.setDataSample(jdot_qdot_);
+    port_coriolis.setDataSample(coriolis);
+    port_gravity.setDataSample(jnt_grav);
+    port_xdd_des.setDataSample(xdd_des_);
+    
+    
+    log(RTT::Warning) << "Checking" << endlog();
+    if(!hasPeer("GurobiSolver"))
+    {
+        log(RTT::Error) << "GurobiSolver not available, exiting." << endlog();
+        return false;
+    }
+    /*TaskContext* gurobi_ptr = getPeer("GurobiSolver");
+    optimize_ = gurobi_ptr->getOperation("optimize");*/
+    traj_computed = computeTrajectory(0.01,0.05,0.05,0.2);
     
     log(RTT::Warning) << " Let's go" << endlog();
-    
-    return cnt;
+#ifdef __XENOMAI__
+    log(RTT::Warning) << "** USING XENOMAI **" << endlog();
+#endif    
+    return true;
 }
 bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,const double vmax, const double accmax)
 {
+    if(!updateState())
+        return false;
     log(Warning) << "Computing Trajectory" << endlog();
     try
     {
-        updateState();
+        
         fk_vel_solver->JntToCart(jnt_pos_vel_kdl,frame_vel_des_kdl,this->seg_names_idx["ati_link"]);
         frame_des_kdl =  frame_vel_des_kdl.GetFrame();
        
@@ -182,7 +218,6 @@ bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,c
     
     log(Info) << "Trajectory computed ! " << endlog();
     publishTrajectory();
-    traj_computed = true;
     return true;
 }
 
@@ -219,16 +254,37 @@ void CartOptCtrl::publishTrajectory()
     port_path_ros.write(path_ros);
     log(Debug) << "Publishing done" << endlog();
 }
-
+/*void * CartOptCtrl::optimize(void * model)
+{
+    while(1)
+    {
+        if(lwr::run_optimize){
+            static_cast<GRBModel*>(model)->optimize();
+            lwr::run_optimize=false;
+        }
+    }
+}*/
 void CartOptCtrl::updateHook()
 {
-    ros::Time t_start = rtt_rosclock::host_now();
+    if(!traj_computed)
+    {
+        return;
+    }
+
+
+#ifdef __XENOMAI__
+	RTIME t_optimize,t_loop;
+	std_msgs::Float64 loop_duration;
+	RTIME t_loop_start = rt_timer_read();
+	RTT::os::TimeService::ticks tt_start = RTT::os::TimeService::Instance()->getTicks();
+#endif
+    //ros::Time t_start = rtt_rosclock::host_now();
     //publishTrajectory();
     
-    log(Debug) << "Start" << endlog();
-    if(!updateState() || !getMassMatrix(mass) || !traj_computed)
+    //log(Debug) << "Start" << endlog();
+    if(!updateState())
         return;
-    log(Debug) << "go" << endlog();
+    //log(Debug) << "go" << endlog();
     Frame X_des,X_mes;
     Twist Xdd_des,Xd_mes,Xd_des;
     
@@ -249,7 +305,7 @@ void CartOptCtrl::updateHook()
     Frame X_tmp(X_curr);
     X_tmp.M = Rotation::Rot(d_err.rot,d_err.rot.Norm()) * X_tmp.M;
     
-    if(1)
+    if(0)
     {
         // Ros pub
        X_curr_msg.header.frame_id = 
@@ -296,21 +352,43 @@ void CartOptCtrl::updateHook()
     id_dyn_solver->JntToCoriolis(jnt_pos_kdl,jnt_vel_kdl,coriolis_kdl);
     id_dyn_solver->JntToGravity(jnt_pos_kdl,gravity_kdl);
     id_dyn_solver->JntToMass(jnt_pos_kdl,mass_kdl);
-    
-    Eigen::Matrix<double,6,1> xdd_des_;
+
     tf::twistKDLToEigen(Xdd_des,xdd_des_);
-    
-    Eigen::Matrix<double,6,1> jdot_qdot_;
     tf::twistKDLToEigen(jdot_qdot,jdot_qdot_);
     
-    try{
-        
-        ros::Time start_opt = rtt_rosclock::host_now();
+    //try{
 #ifndef __XENOMAI__
         struct timeval tbegin,tend;
         gettimeofday(&tbegin,NULL);
+#else
+	RTIME t_start = rt_timer_read();
+//	timespec ts = {0,0};
+//	clock_gettime(CLOCK_HOST_REALTIME,&ts);
+//	ros::Time start_opt = ros::Time(ts.tv_sec, ts.tv_nsec);
 #endif
-        cart_model_solver_.optimize(jnt_pos,
+            port_q.write(jnt_pos);
+            port_qdot.write(jnt_vel);
+            port_jacobian.write(J_ati_base.data);
+            port_mass.write(mass_kdl.data);
+            port_dt.write(kdt_*static_cast<double>(getPeriod()));
+            port_jdot_qdot.write(jdot_qdot_);
+            port_coriolis.write(coriolis_kdl.data);
+            port_gravity.write(gravity_kdl.data);
+            port_xdd_des.write(xdd_des_);
+            port_optimize_event.write(true);
+    /*update_(jnt_pos,
+                                    jnt_vel,
+                                    3.*static_cast<double>(getPeriod()),
+                                    J_ati_base.data,
+                                    mass_kdl.data,
+                                    jdot_qdot_,
+                                    coriolis_kdl.data,
+                                    gravity_kdl.data,
+                                    xdd_des_);*/
+
+            /*int rc = pthread_create(&th_, NULL , &lwr::CartOptCtrl::optimize,&cart_model_solver_);
+            pthread_join(th_,NULL);*/
+        /*cart_model_solver_.optimize(jnt_pos,
                                     jnt_vel,
                                     
                                     3.*static_cast<double>(getPeriod()),
@@ -322,27 +400,31 @@ void CartOptCtrl::updateHook()
                                     xdd_des_,
                                     jnt_trq_cmd);
 
-        cart_model_solver_.getQddBounds(qdd_min_ros.data,qdd_max_ros.data,qdd_des_ros.data);
+        cart_model_solver_.getQddBounds(qdd_min_ros.data,qdd_max_ros.data,qdd_des_ros.data);*/
 #ifndef __XENOMAI__
         gettimeofday(&tend,NULL);
+#else
+	RTIME t_stop = rt_timer_read();
+//	clock_gettime(CLOCK_HOST_REALTIME,&ts);
+//        ros::Time stop_opt = ros::Time(ts.tv_sec, ts.tv_nsec);
 #endif
         // Don't forget to remove G(q) as Kuka adds it on KRC 
-        jnt_trq_cmd-=gravity_kdl.data;
-        
-        this->solver_duration = (rtt_rosclock::host_now() - start_opt).toSec();
-        
-        std_msgs::Float32 d;
+        //jnt_trq_cmd-=gravity_kdl.data;
+
+        std_msgs::Float64 d;
 #ifndef __XENOMAI__
         d.data =  1000*(tend.tv_sec-tbegin.tv_sec)+(tend.tv_usec-tbegin.tv_usec)/1000.;
 #else
-        d.data = solver_duration;
+	t_optimize = rt_timer_ticks2ns(t_stop-t_start);
+	d.data = t_optimize;
+//        d.data = (stop_opt - start_opt).toSec();
 #endif
-        port_solver_duration.write(d);
-        port_qdd_des.write(qdd_des_ros);
-        port_qdd_min.write(qdd_min_ros);
-        port_qdd_max.write(qdd_max_ros);
+    port_solver_duration.write(d);
+    port_qdd_des.write(qdd_des_ros);
+    port_qdd_min.write(qdd_min_ros);
+    port_qdd_max.write(qdd_max_ros);
         
-    } catch(GRBException e) {
+    /*} catch(GRBException e) {
         log(RTT::Error) << "Error code = " << e.getErrorCode() << endlog();
         log(RTT::Error) << e.getMessage() << endlog();
         log(RTT::Error) << "jnt_pos_kdl"<<jnt_pos_kdl
@@ -357,14 +439,14 @@ void CartOptCtrl::updateHook()
                         <<endlog();
     } catch(...) {
         log(RTT::Error) << "Exception during optimization" << endlog();
-    }    
-    log(Info) << "trqcmd " << jnt_trq_cmd.transpose() << endlog();
+    } */   
+    //log(Info) << "trqcmd " << jnt_trq_cmd.transpose() << endlog();
     
-    if(!debug_mode_)
+    /*if(!debug_mode_)
         if(!isCommandMode())
-            return;
+            return;*/
         
-    sendJointTorque(jnt_trq_cmd);
+    //sendJointTorque(jnt_trq_cmd);
     
     // Incremente traj
     if(isReadyToStart()){
@@ -373,8 +455,18 @@ void CartOptCtrl::updateHook()
         else
             t_traj_curr = 0.0;
     }
-    ros::Duration t_elapsed = rtt_rosclock::host_now() - t_start;
-    elapsed = t_elapsed.toSec();
+#ifdef __XENOMAI__
+	RTIME t_loop_stop = rt_timer_read();
+        
+	t_loop = rt_timer_ticks2ns(t_loop_stop-t_loop_start);
+        loop_duration.data = t_loop;
+//	loop_duration.data = elapsed;
+	port_loop_duration.write(loop_duration);
+//	if(t_loop < t_optimize)
+//		log(RTT::Error) << "Negative duration"<<endlog();
+#endif
+   // ros::Duration t_elapsed = rtt_rosclock::host_now() - t_start;
+  //  elapsed = t_elapsed.toSec();
 }
 
 }
