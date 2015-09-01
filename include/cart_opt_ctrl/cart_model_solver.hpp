@@ -113,11 +113,16 @@ public:
         return true;
     }
 
-    template<class T> void getTorque(T& torque)
+    template<class T> void getTorque(T& torque,bool only_additionnal_torque=false)
     {
         try{
             for(unsigned int i=0;i<Ndof && i<torque.rows();++i)
                 torque[i] = tau_v_[i].get(GRB_DoubleAttr_X);
+
+            if(only_additionnal_torque)
+                for(unsigned int i=0;i<Ndof && i<torque.rows();++i)
+                    torque[i] -= gravity_[i];
+
         } catch(GRBException e) {}
     }
 
@@ -192,6 +197,7 @@ private:
 			const Eigen::Matrix<double,Ndof,1>& gravity,
 			const Eigen::Matrix<double,6,1>& xdd_des)	
     {
+        gravity_ = gravity;
         mass_inv_ = mass.inverse();
         a_ = jacobian * mass_inv_;
         b_qqd_ = coriolis + gravity;
@@ -253,7 +259,9 @@ private:
                                     Q_;
                                     
     Eigen::Matrix<double,1,Ndof> q_;
-           
+    
+    Eigen::Matrix<double,Ndof,1> gravity_;
+
     double lin_cte_;
     
     pthread_t th_;

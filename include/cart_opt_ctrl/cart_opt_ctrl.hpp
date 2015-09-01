@@ -218,9 +218,7 @@ public:
                   
 
                   cart_model_solver_.optimize();
-                  cart_model_solver_.getTorque(torque_out);
-
-                  torque_out-=gravity;
+                  cart_model_solver_.getTorque(torque_out,true);
 
                   port_torque_out.write(torque_out);
             }
