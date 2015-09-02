@@ -198,19 +198,19 @@ public:
       {
             gettimeofday(&tbegin,NULL);
 
-            RTT::FlowStatus fs = port_q.read(q);
+            RTT::FlowStatus fs = port_q.readNewest(q);
             if(fs == RTT::NoData){
                   usleep(250.0);
                   RTT::log(RTT::Error) << "NoData" << RTT::endlog();
             }else{
-                  port_qdot.read(qdot);
-                  port_jacobian.read(jacobian);
-                  port_mass.read(mass);
-                  port_dt.read(dt);
-                  port_jdot_qdot.read(jdot_qdot);
-                  port_coriolis.read(coriolis);
-                  port_gravity.read(gravity);
-                  port_xdd_des.read(xdd_des);
+                  port_qdot.readNewest(qdot);
+                  port_jacobian.readNewest(jacobian);
+                  port_mass.readNewest(mass);
+                  port_dt.readNewest(dt);
+                  port_jdot_qdot.readNewest(jdot_qdot);
+                  port_coriolis.readNewest(coriolis);
+                  port_gravity.readNewest(gravity);
+                  port_xdd_des.readNewest(xdd_des);
 
                   cart_model_solver_.update(q,qdot,dt,
                         jacobian,mass,jdot_qdot,
