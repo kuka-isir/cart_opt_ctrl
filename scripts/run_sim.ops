@@ -2,7 +2,7 @@ import("rtt_ros")
 ros.import("cart_opt_ctrl")
 
 loadComponent("CartOptCtrl","lwr::CartOptCtrl")
-loadComponent("GurobiSolver","gurobi::RTTCartOptSolver")
+loadComponent("GurobiSolver","RTTCartOptSolver")
 
 
 

@@ -3,7 +3,6 @@
 namespace lwr{
 using namespace RTT;
 using namespace KDL;
-using namespace gurobi;
 
 CartOptCtrl::CartOptCtrl(const std::string& name):
 t_traj_curr(0),
@@ -50,10 +49,6 @@ RTTLWRAbstract(name)
     this->addAttribute("use_xd_des",use_xd_des_);
     this->addAttribute("use_xdd_des",use_xdd_des_);
     this->addAttribute("ReadyToStart",ready_to_start_);
-    this->addOperation("setSolverMethod",&CartOptCtrl::setSolverMethod,this,RTT::OwnThread);
-    this->addOperation("setSolverVerbose",&CartOptCtrl::setSolverVerbose,this,RTT::OwnThread);
-    this->addOperation("setSolverTimeLimit",&CartOptCtrl::setSolverTimeLimit,this,RTT::OwnThread);
-    this->addOperation("setSolverBarrierConvergeanceTolerance",&CartOptCtrl::setSolverBarrierConvergeanceTolerance,this,RTT::OwnThread);
     this->addAttribute("jacobian_solver_type",jacobian_solver_type_);
     this->provides("debug")->addAttribute("solver_duration",solver_duration);
     this->provides("debug")->addAttribute("UpdateHookDuration",elapsed);
@@ -72,24 +67,7 @@ RTTLWRAbstract(name)
             this->addPort("xdd_des",port_xdd_des).doc("");
             this->addPort( "optimize", port_optimize_event ).doc( "" );
 }
-void CartOptCtrl::setSolverMethod(int i)
-{
-    //cart_model_solver_.setMethod(i);
-}
 
-void CartOptCtrl::setSolverBarrierConvergeanceTolerance(double t)
-{
-    //cart_model_solver_.setBarrierConvergeanceTolerance(t);
-}
-void CartOptCtrl::setSolverTimeLimit(double t)
-{
-    //this->cart_model_solver_.setTimeLimit(t);
-}
-
-void CartOptCtrl::setSolverVerbose(bool v)
-{
-    //this->cart_model_solver_.setVerbose(v);
-}
 bool CartOptCtrl::configureHook()
 {
     log(Warning) << "Configuring parent" << endlog();

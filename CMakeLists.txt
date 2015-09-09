@@ -5,11 +5,20 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 set(CMAKE_BUILD_TYPE Release)
 
-#find_package(Ceres REQUIRED)
-#include_directories(${CERES_INCLUDE_DIRS})
+find_package(Ceres)
+if(${Ceres_FOUND})
+    include_directories(${CERES_INCLUDE_DIRS})
+endif()
 
-find_package(GUROBI REQUIRED)
-include_directories(${GUROBI_INCLUDE_DIRS})
+find_package(qpOASES)
+if(${qpOASES_FOUND})
+    include_directories(${qpOASES_INCLUDE_DIRS})
+endif()
+
+find_package(GUROBI)
+if(${GUROBI_FOUND})
+    include_directories(${GUROBI_INCLUDE_DIRS})
+endif()
 
 find_package(catkin REQUIRED COMPONENTS
     rtt_ros
@@ -45,8 +54,6 @@ include_directories(
 orocos_component(${PROJECT_NAME} src/${PROJECT_NAME}.cpp)
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMPONENT)
 if($ENV{OROCOS_TARGET} STREQUAL "xenomai")
-  #find_package(Xenomai REQUIRED)
-  #include_directories(${Xenomai_INCLUDE_DIR})
   set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS __XENOMAI__)
 endif()
 
@@ -54,6 +61,22 @@ endif()
 list(REMOVE_ITEM catkin_LIBRARIES lwr_fri_generate_messages_cpp)
 list(REMOVE_ITEM catkin_LIBRARIES lwr_fri_generate_messages_lisp)
 list(REMOVE_ITEM catkin_LIBRARIES lwr_fri_generate_messages_py)
+
+if(GUROBI_FOUND)
+  set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS USE_GUROBI)
+  message(STATUS "Using Gurobi")
+endif()
+
+if(CERES_FOUND)
+  set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS USE_CERES)
+  message(STATUS "Using Ceres")
+endif()
+
+if(qpOASES_FOUND)
+  set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS USE_QPOASES)
+  message(STATUS "Using qpOASES")
+endif()
+
 
 target_link_libraries(${PROJECT_NAME}
     #${Xenomai_LIBRARIES}
@@ -65,7 +88,8 @@ target_link_libraries(${PROJECT_NAME}
     ${GUROBI_LIBRARIES}
     ${USE_OROCOS_LIBRARIES}
     #${Xenomai_LIBRARIES}
-    #${CERES_LIBRARIES}
+    ${CERES_LIBRARIES}
+    ${qpOASES_LIBRARIES}
 )
 
 orocos_install_headers(DIRECTORY include/${PROJECT_NAME})

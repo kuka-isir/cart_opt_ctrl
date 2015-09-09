@@ -18,7 +18,7 @@
 #define __CART_OPT_CTRL_HPP__
 
 #include "rtt_lwr_abstract/rtt_lwr_abstract.hpp"
-#include "cart_opt_ctrl/cart_model_solver.hpp"
+#include "cart_opt_ctrl/lwr_cart_solver.hpp"
 
 #include <eigen_conversions/eigen_msg.h>
 #include <kdl/frames.hpp>
@@ -66,10 +66,6 @@ namespace lwr{
       bool computeTrajectory(const double radius,const double eqradius,const double vmax=0.02, const double accmax=0.1);
       void updateHook();
       bool configureHook();
-      void setSolverVerbose(bool v);
-      void setSolverTimeLimit(double t);
-      void setSolverBarrierConvergeanceTolerance(double t);
-      void setSolverMethod(int i);
       static void * optimize(void * arg);
       RTT::OutputPort<geometry_msgs::PoseStamped> port_X_curr;
       RTT::OutputPort<geometry_msgs::PoseStamped> port_X_des;
@@ -144,13 +140,12 @@ namespace lwr{
       KDL::Wrench ft_wrench_kdl;
       Eigen::Matrix<double,6,1> xdd_des_;
       Eigen::Matrix<double,6,1> jdot_qdot_;
-      //lwr::LWRCartOptSolver cart_model_solver_;
 private:
       bool model_verbose_;
       double solver_duration;
   };
 }
-namespace gurobi{
+
 class RTTCartOptSolver: public RTT::TaskContext
 {
 public:
@@ -167,18 +162,40 @@ public:
             this->addPort("xdd_des",port_xdd_des).doc("");
             this->addPort("torque_out",port_torque_out).doc("");
             this->ports()->addEventPort( "optimize", port_optimize_event ).doc( "" );
+            /*this->addOperation("setMethod",&RTTCartOptSolver::setMethod,this,RTT::OwnThread).doc( "" );
+            this->addOperation("setVerbose",&RTTCartOptSolver::setVerbose,this,RTT::OwnThread).doc( "" );
+            this->addOperation("setTimeLimit",&RTTCartOptSolver::setTimeLimit,this,RTT::OwnThread).doc( "" );
+            this->addOperation("setBarrierConvergeanceTolerance",&RTTCartOptSolver::setBarrierConvergeanceTolerance,this,RTT::OwnThread).doc( "" );*/
       }
+    /*  void setMethod(int i)
+    {
+        cart_model_solver_.setMethod(i);
+    }
+
+    void setBarrierConvergeanceTolerance(double t)
+    {
+        cart_model_solver_.setBarrierConvergeanceTolerance(t);
+    }
+    void setTimeLimit(double t)
+    {
+        cart_model_solver_.setTimeLimit(t);
+    }
+
+    void setVerbose(bool v)
+    {
+        cart_model_solver_.setVerbose(v);
+    }*/
       bool configureHook()
       {
-            q.resize(Ndof);
-            qdot.resize(Ndof);
-            jacobian.resize(Ndof,Ndof);
-            mass.resize(Ndof,Ndof);
+            q.resize(LBR_MNJ);
+            qdot.resize(LBR_MNJ);
+            jacobian.resize(LBR_MNJ,LBR_MNJ);
+            mass.resize(LBR_MNJ,LBR_MNJ);
             jdot_qdot.resize(6);
-            coriolis.resize(Ndof);
-            gravity.resize(Ndof);
+            coriolis.resize(LBR_MNJ);
+            gravity.resize(LBR_MNJ);
             xdd_des.resize(6);
-            torque_out.resize(Ndof);
+            torque_out.resize(LBR_MNJ);
 
             torque_out.setZero();
             q.setZero();
@@ -228,7 +245,7 @@ public:
             port_optimize_time.write(elapsed_ros);
             //this->trigger();
       }
-
+      
       RTT::InputPort<Eigen::VectorXd> port_q;
       RTT::InputPort<Eigen::VectorXd> port_qdot;
       RTT::InputPort<double> port_dt;
@@ -257,12 +274,11 @@ public:
       std_msgs::Float64 elapsed_ros;
 
 protected:
-      lwr::LWRCartOptSolver cart_model_solver_;
+      lwr::LWRCartOptSolver<CartOptSolverGurobi,LBR_MNJ> cart_model_solver_;
 
 };
 
-}
 ORO_LIST_COMPONENT_TYPE(lwr::CartOptCtrl)
-ORO_LIST_COMPONENT_TYPE(gurobi::RTTCartOptSolver)
+ORO_LIST_COMPONENT_TYPE(RTTCartOptSolver)
 ORO_CREATE_COMPONENT_LIBRARY()
 #endif
