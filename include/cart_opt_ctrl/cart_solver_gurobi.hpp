@@ -62,21 +62,10 @@ public:
         }
     }
     
-    void update(const Eigen::Matrix<double,6,Ndof>& jacobian,
-                  const Eigen::Matrix<double,Ndof,Ndof>& mass,
-                  const Eigen::Matrix<double,6,1>& jdot_qdot,
-                  const Eigen::Matrix<double,Ndof,1>& coriolis,
-                  const Eigen::Matrix<double,Ndof,1>& gravity,
-                  const Eigen::Matrix<double,6,1>& xdd_des
-                  )
+    void modelUpdate()
     {
-        updateBounds();
-        this->updateObjData(jacobian,mass,jdot_qdot,coriolis,gravity,xdd_des);
-        updateObj();
-        updateDynamicsConstr(mass,this->b_qqd_);
-	    model_.update();        
+        model_.update();
     }
-
     bool optimize(){
         try{
             model_.optimize();
@@ -171,7 +160,7 @@ private:
         model_.update();
     }
     
-    bool updateObj()
+    void updateObj()
     {
         obj_quad_ = 0;
         obj_lin_ = 0;
@@ -181,9 +170,8 @@ private:
 		for(unsigned int j=0;j<Ndof;++j)
 			obj_quad_+= tau_v_[i] * this->Q_(i,j) * tau_v_[j];
         }
-        this->lin_cte_ = this->cte_ * this->cte_.transpose();
-	model_.setObjective(obj_quad_ + obj_lin_ + this->lin_cte_,GRB_MINIMIZE);
-        return true;
+        //this->lin_cte_ = this->cte_ * this->cte_.transpose();
+	model_.setObjective(obj_quad_ + obj_lin_ /*+ this->lin_cte_*/,GRB_MINIMIZE);
     }
 private:    
     GRBEnv env_;

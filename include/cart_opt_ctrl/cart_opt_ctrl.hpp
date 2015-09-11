@@ -216,10 +216,7 @@ public:
             gettimeofday(&tbegin,NULL);
 
             RTT::FlowStatus fs = port_q.readNewest(q);
-            if(fs == RTT::NoData){
-                  usleep(250.0);
-                  RTT::log(RTT::Error) << "NoData" << RTT::endlog();
-            }else{
+            if(fs != RTT::NoData){
                   port_qdot.readNewest(qdot);
                   port_jacobian.readNewest(jacobian);
                   port_mass.readNewest(mass);
@@ -231,7 +228,7 @@ public:
 
                   cart_model_solver_.update(q,qdot,dt,
                         jacobian,mass,jdot_qdot,
-                        coriolis,gravity,xdd_des);
+                        coriolis,gravity,xdd_des );
                   
 
                   cart_model_solver_.optimize();
@@ -274,7 +271,7 @@ public:
       std_msgs::Float64 elapsed_ros;
 
 protected:
-      lwr::LWRCartOptSolver<CartOptSolverGurobi,LBR_MNJ> cart_model_solver_;
+      lwr::LWRCartOptSolver<CartOptSolverqpOASES> cart_model_solver_;
 
 };
 

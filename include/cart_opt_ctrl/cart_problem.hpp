@@ -55,7 +55,7 @@ protected:
     Eigen::Matrix<double,1,6> cte_; 
     
     Eigen::Matrix<double,Ndof,Ndof> mass_inv_;
-    Eigen::Matrix<double,Ndof,Ndof,Eigen::RowMajor> Q_;
+    Eigen::Matrix<double,Ndof,Ndof> Q_;
                                     
     Eigen::Matrix<double,1,Ndof> q_;
     
