@@ -141,15 +141,6 @@ bool CartOptCtrl::configureHook()
     port_gravity.setDataSample(jnt_grav);
     port_xdd_des.setDataSample(xdd_des_);
     
-    
-    log(RTT::Warning) << "Checking" << endlog();
-    if(!hasPeer("GurobiSolver"))
-    {
-        log(RTT::Error) << "GurobiSolver not available, exiting." << endlog();
-        return false;
-    }
-    /*TaskContext* gurobi_ptr = getPeer("GurobiSolver");
-    optimize_ = gurobi_ptr->getOperation("optimize");*/
     traj_computed = computeTrajectory(0.01,0.05,0.05,0.2);
     
     log(RTT::Warning) << " Let's go" << endlog();
