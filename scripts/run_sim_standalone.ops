@@ -6,4 +6,4 @@ runScript(ros.find("rtt_lwr_sim")+"/scripts/lwr_sim_standalone.ops")
 runScript(ros.find("cart_opt_ctrl")+"/scripts/run_sim.ops")
 
 CartOptCtrl.start()
-GurobiSolver.start()
+Solver.start()
