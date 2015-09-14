@@ -5,10 +5,10 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 set(CMAKE_BUILD_TYPE Release)
 
-find_package(Ceres)
-if(Ceres_FOUND)
-    include_directories(${CERES_INCLUDE_DIRS})
-endif()
+#find_package(Ceres)
+#if(Ceres_FOUND)
+#    include_directories(${CERES_INCLUDE_DIRS})
+#endif()
 
 find_package(qpOASES)
 if(qpOASES_FOUND)
