@@ -19,8 +19,10 @@ public:
     do_init(true),
     cart_prob(NVars,NConstrs)
     {
+        this->name_="qpOASES";
         Options options;
         options.enableRegularisation = qpOASES::BT_TRUE;
+        //options.setToMPC();
         options.enableEqualities = BT_TRUE;
         cart_prob.setOptions( options );
         cart_prob.setPrintLevel(qpOASES::PL_LOW);
@@ -91,9 +93,10 @@ public:
                 qdd[i] = x_out[i+Ndof];
     }
     bool optimize(){
-        nWSR = 100;
+        nWSR = 1000;
         if(do_init)
         {
+            nWSR = 1E6;
             ret_ = cart_prob.init( H,g,A,lb,ub,eqA,eqA, nWSR,&cpulimit);
             do_init = false;
         }else

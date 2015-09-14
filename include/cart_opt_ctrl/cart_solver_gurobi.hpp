@@ -25,6 +25,7 @@ public:
     dynamics_constr_(Ndof),
     dynamics_constr_added_(Ndof,false)
     {
+        this->name_ = "Gurobi";
         addVars();
         setVerbose(false);
     }

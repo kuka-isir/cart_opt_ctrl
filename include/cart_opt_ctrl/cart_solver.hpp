@@ -5,7 +5,9 @@
 template<unsigned int Ndof>
 class CartOptSolver: public CartProblem<Ndof>
 {
-public: 
+public:
+    CartOptSolver():name_("solver"){}
+    const std::string getName()const{return name_;}
     void update(const Eigen::Matrix<double,6,Ndof>& jacobian,
                   const Eigen::Matrix<double,Ndof,Ndof>& mass,
                   const Eigen::Matrix<double,6,1>& jdot_qdot,
@@ -28,6 +30,8 @@ public:
     virtual void modelUpdate()= 0;
     template<class T> void getTorque(T& torque,bool only_additionnal_torque=false);
     template<class T> void getQdd(T& qdd);
+protected:
+    std::string name_;
 };
 
 #endif

@@ -49,7 +49,9 @@
 #include <geometry_msgs/PoseArray.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/Float32MultiArray.h>
-
+#include <rtt/os/TimeService.hpp>
+#include <rtt/Time.hpp>
+  
 template <typename T>
 T clip(const T& n, const T& lower, const T& upper) {
   return std::max(lower, std::min(n, upper));
@@ -207,12 +209,13 @@ public:
             gravity.setZero();
             xdd_des.setZero();
             
-            port_optimize_time.createStream(rtt_roscomm::topic("~"+this->getName()+"/optimize_time"));
+            port_optimize_time.createStream(rtt_roscomm::topic("~"+this->getName()+"/"+cart_model_solver_.getName()+"_duration"));
             return true;
       }
 
       void updateHook()
       {
+            //RTT::os::TimeService::ticks timestamp = RTT::os::TimeService::Instance()->getTicks();
             gettimeofday(&tbegin,NULL);
 
             RTT::FlowStatus fs = port_q.readNewest(q);
@@ -237,8 +240,9 @@ public:
                   port_torque_out.write(torque_out);
             }
             gettimeofday(&tend,NULL);
-
             elapsed_ros.data = 1000.*(tend.tv_sec-tbegin.tv_sec)+(tend.tv_usec-tbegin.tv_usec)/1000.;
+            //RTT::Seconds elapsed = RTT::os::TimeService::Instance()->secondsSince( timestamp );
+            //elapsed_ros.data = elapsed;
             port_optimize_time.write(elapsed_ros);
             //this->trigger();
       }
