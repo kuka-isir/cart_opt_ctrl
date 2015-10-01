@@ -171,7 +171,7 @@ bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,c
         // always call Finish() at the end, otherwise the last segment will not be added.
         path->Finish();
         
-        velpref = new VelocityProfile_Trap(0.03,0.1);
+        velpref = new VelocityProfile_Trap(vmax,accmax);
         velpref->SetProfile(0,path->PathLength());  
         traject = new Trajectory_Segment(path, velpref);
         
