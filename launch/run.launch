@@ -30,7 +30,15 @@
     <arg name="rviz" default="true" />
     <!-- The level of verbose (never, fatal, critical, error, warning, info, debug, realtime) -->
     <arg name="log_level" default="warning" />
+    <!-- Tools -->
+    <arg name="load_base" default="false" />
+    <arg name="load_ati_sensor" default="true" />
+    <arg name="load_calib_tool" default="true" />
+    <arg name="load_handle" default="true" />
 
+    <!-- Gazebo -->
+    <arg name="gazebo_gui" default="true"/>
+    <arg name="launch_gazebo" default="true"/>
 <!--============ CartOptCtrl Params ============-->
 
     <!-- Some parameter -->
@@ -39,7 +47,6 @@
     <!-- The parameters that the CartOptCtrl sensor will get -->
     <rosparam ns="CartOptCtrl" subst_value="true">
         debug_mode: false
-
     </rosparam>
 
 <!--============ LWR Runner script ===============-->  
@@ -54,7 +61,13 @@
         <arg name="debug" value="$(arg debug)" />
         <arg name="rviz" value="$(arg rviz)" />
         <arg name="log_level" value="$(arg log_level)" />
-        <arg name="tip_link" default="$(arg tip_link)"/>
+        <arg name="tip_link" value="$(arg tip_link)"/>
+        <arg name="load_base" value="$(arg load_base)" />
+        <arg name="load_ati_sensor" value="$(arg load_ati_sensor)" />
+        <arg name="load_calib_tool" value="$(arg load_calib_tool)" />
+        <arg name="load_handle" value="$(arg load_handle)" />
+        <arg name="gazebo_gui" value="$(arg gazebo_gui)"/>
+        <arg name="launch_gazebo" value="$(arg launch_gazebo)"/>
     </include>
 
 </launch>
