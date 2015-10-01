@@ -25,7 +25,7 @@ public:
         //options.setToMPC();
         options.enableEqualities = BT_TRUE;
         cart_prob.setOptions( options );
-        cart_prob.setPrintLevel(qpOASES::PL_LOW);
+        cart_prob.setPrintLevel(qpOASES::PL_NONE);
         
         A_.setZero();
         H_.setZero();
@@ -93,7 +93,7 @@ public:
                 qdd[i] = x_out[i+Ndof];
     }
     bool optimize(){
-        nWSR = 1000;
+        nWSR = 100;
         if(do_init)
         {
             nWSR = 1E6;
