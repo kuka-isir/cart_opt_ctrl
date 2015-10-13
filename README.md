@@ -1,5 +1,8 @@
 Operationnal Space Optimal Controller
 ============
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=GvoJYVcKSw0
+" target="_blank"><img src="http://img.youtube.com/vi/GvoJYVcKSw0/0.jpg" 
+alt="CartOptCtrl Gazebo 6" width="640" height="480" border="0" /></a>
 
 ### Task Formulation 
 <img src="http://www.sciweavers.org/tex2img.php?eq=%5Cvect%7Bg%7D%5Cleft%28%5Cboldsymbol%7B%5Ctau%7D%2C%5Cvect%7B%5Cddot%7BX%7D%7D%5Ec%5Cright%29%20%3D%20%20%5Cvect%7B%5Cddot%7BX%7D%7D%5Ec%20-%20%5Cvect%7B%5Cddot%7BX%7D%7D&bc=Transparent&fc=Black&im=png&fs=18&ff=modern&edit=0" align="center" border="0" alt="\vect{g}\left(\boldsymbol{\tau},\vect{\ddot{X}}^c\right) =  \vect{\ddot{X}}^c - \vect{\ddot{X}}" width="227" height="50" />
