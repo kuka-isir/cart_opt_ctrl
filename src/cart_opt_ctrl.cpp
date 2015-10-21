@@ -26,6 +26,11 @@ use_ft_sensor_(false),
 model_verbose_(false),
 jacobian_solver_type_(WDL_SOLVER),
 kdt_(5.0),
+init_pos_acquired(false),
+use_sim_clock(false),
+trajectory_frame("link_7"),
+spacenav_scale_trans(0.01),
+spacenav_scale_rot(0.01),
 RTTLWRAbstract(name)
 {
 //     this->ports()->addPort("PathROS",port_path_ros).doc("");
@@ -35,26 +40,30 @@ RTTLWRAbstract(name)
     this->ports()->addPort("FTData",port_ftdata).doc("The ATI F/T Sensor Input");
     this->addOperation("publishTrajectory",&CartOptCtrl::publishTrajectory,this,RTT::OwnThread);
     this->addOperation("computeTrajectory",&CartOptCtrl::computeTrajectory,this,RTT::OwnThread);
-    this->addAttribute("kp_lin",kp_lin);
-    this->addAttribute("kp_ang",kp_ang);
-    this->addAttribute("kd_lin",kd_lin);
-    this->addAttribute("kd_ang",kd_ang);
-    this->addAttribute("dw_max",dw_max_);
-    this->addAttribute("dx_ang",d_ang_max_);
-    this->addAttribute("kdt",kdt_);
-    this->addAttribute("debug_mode",debug_mode_);
-    this->addAttribute("use_jdot_qdot",use_jdot_qdot_);
-    this->addAttribute("use_f_ext",use_f_ext_);
-    this->addAttribute("use_coriolis",use_coriolis_);
-    this->addAttribute("use_xd_des",use_xd_des_);
-    this->addAttribute("use_xdd_des",use_xdd_des_);
-    this->addAttribute("ReadyToStart",ready_to_start_);
-    this->addAttribute("jacobian_solver_type",jacobian_solver_type_);
+    this->addProperty("kp_lin",kp_lin);
+    this->addProperty("kp_ang",kp_ang);
+    this->addProperty("kd_lin",kd_lin);
+    this->addProperty("kd_ang",kd_ang);
+    this->addProperty("dw_max",dw_max_);
+    this->addProperty("dx_ang",d_ang_max_);
+    this->addProperty("spacenav_scale_trans",spacenav_scale_trans);
+    this->addProperty("spacenav_scale_rot",spacenav_scale_rot);
+    this->addProperty("trajectory_frame",trajectory_frame);
+    this->addProperty("kdt",kdt_);
+    this->addProperty("debug_mode",debug_mode_);
+    this->addProperty("use_jdot_qdot",use_jdot_qdot_);
+    this->addProperty("use_f_ext",use_f_ext_);
+    this->addProperty("use_coriolis",use_coriolis_);
+    this->addProperty("use_xd_des",use_xd_des_);
+    this->addProperty("use_xdd_des",use_xdd_des_);
+    this->addProperty("ReadyToStart",ready_to_start_);
+    this->addProperty("jacobian_solver_type",jacobian_solver_type_);
     this->provides("debug")->addAttribute("solver_duration",solver_duration);
     this->provides("debug")->addAttribute("UpdateHookDuration",elapsed);
     this->provides("debug")->addAttribute("WrenchInBase",F_ext);
-    this->addAttribute("use_mass_sqrt",use_mass_sqrt_);
-    this->addAttribute("use_ft_sensor",use_ft_sensor_);
+    this->addProperty("use_mass_sqrt",use_mass_sqrt_);
+    this->addProperty("use_ft_sensor",use_ft_sensor_);
+    this->addProperty("use_sim_clock",use_sim_clock);
 // Async Optimize
             this->addPort("q",port_q).doc("");
             this->addPort("qdot",port_qdot).doc("");
@@ -86,13 +95,11 @@ bool CartOptCtrl::configureHook()
     
     log(Warning) << "Getting state" << endlog();
     int cnt = 10;
-    while(!updateState() && !cnt--)
+    while(!updateState() && cnt--)
     {
         log(Warning) << "Waiting for lwr_fri to publish data " << endlog();
-        usleep(5e5);
+        usleep(1e6);
     }
-    if(!cnt)
-        return false;
     
     log(Warning) << "setJointTorqueControlMode" << endlog();
     setJointTorqueControlMode();
@@ -102,7 +109,7 @@ bool CartOptCtrl::configureHook()
     X_err.setZero();
     Xd_err.setZero();
     
-
+    port_spacenav.createStream(rtt_roscomm::topic("spacenav/twist"));
     
     port_X_curr.createStream(rtt_roscomm::topic("~"+getName()+"/pos_curr"));
     port_X_tmp.createStream(rtt_roscomm::topic("~"+getName()+"/pos_tmp"));
@@ -143,10 +150,18 @@ bool CartOptCtrl::configureHook()
     
     traj_computed = computeTrajectory(0.01,0.05,0.05,0.2);
     
+    if(use_sim_clock){
+        RTT::Logger::Instance()->in(getName());
+        RTT::log(RTT::Warning) << "Using ROS Sim Clock" << RTT::endlog();
+        rtt_rosclock::use_ros_clock_topic();
+        rtt_rosclock::enable_sim();
+        rtt_rosclock::set_sim_clock_activity(this);
+    }
+    
     log(RTT::Warning) << " Let's go" << endlog();
 #ifdef __XENOMAI__
     log(RTT::Warning) << "** USING XENOMAI **" << endlog();
-#endif    
+#endif
     return true;
 }
 bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,const double vmax, const double accmax)
@@ -157,7 +172,7 @@ bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,c
     try
     {
         
-        fk_vel_solver->JntToCart(jnt_pos_vel_kdl,frame_vel_des_kdl,this->seg_names_idx["ati_link"]);
+        fk_vel_solver->JntToCart(jnt_pos_vel_kdl,frame_vel_des_kdl,this->seg_names_idx[trajectory_frame]);
         frame_des_kdl =  frame_vel_des_kdl.GetFrame();
        
         path = new Path_RoundedComposite(radius,eqradius,new RotationalInterpolation_SingleAxis());
@@ -178,6 +193,7 @@ bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,c
         ctraject = new Trajectory_Composite();
         ctraject->Add(traject);
         ctraject->Add(new Trajectory_Stationary(1.0,frame_des_kdl));
+        traj_computed = true;
         
     } catch(KDL::Error& error) {
             std::cout <<"I encountered this error : " << error.Description() << endlog();
@@ -185,13 +201,15 @@ bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,c
             return false;
     }
     
-    log(Info) << "Trajectory computed ! " << endlog();
+    log(Warning) << "Trajectory computed ! " << endlog();
     publishTrajectory();
     return true;
 }
 
 void CartOptCtrl::publishTrajectory()
 {
+    if(!traj_computed)
+        return;
     double dt=static_cast<double>(this->getPeriod());
     nav_msgs::Path path_ros;
     path_ros.header.frame_id = root_link;
@@ -235,11 +253,9 @@ void CartOptCtrl::publishTrajectory()
 }*/
 void CartOptCtrl::updateHook()
 {
-    if(!traj_computed)
-    {
+    RTT::log(RTT::Debug) << "CartOptCtrl Update at "<<rtt_rosclock::host_now()<< RTT::endlog();
+    if(!updateState())
         return;
-    }
-
 
 #ifdef __XENOMAI__
 	RTIME t_optimize,t_loop;
@@ -251,18 +267,38 @@ void CartOptCtrl::updateHook()
     //publishTrajectory();
     
     //log(Debug) << "Start" << endlog();
-    if(!updateState())
-        return;
-    //log(Debug) << "go" << endlog();
-    Frame X_des,X_mes;
-    Twist Xdd_des,Xd_mes,Xd_des;
+
+    //log(Debug) << "go" << endlog();    
+    static Frame X_des,X_mes;
+    static Twist Xdd_des,Xd_mes,Xd_des;
     
-    X_des = traject->Pos(t_traj_curr);
-    
+
+    geometry_msgs::Twist spacenav_tw;
+    if(port_spacenav.read(spacenav_tw) != RTT::NoData)
+    {
+        // Bypassing everybody :)
+        X_des.M = KDL::Rotation::RPY(spacenav_scale_rot * spacenav_tw.angular.x,
+                                              spacenav_scale_rot * spacenav_tw.angular.y,
+                                              spacenav_scale_rot * spacenav_tw.angular.z);
+        X_des.p = X_des.p + KDL::Vector(spacenav_scale_trans * spacenav_tw.linear.x,
+                                                  spacenav_scale_trans * spacenav_tw.linear.y,
+                                                  spacenav_scale_trans * spacenav_tw.linear.z);
+    }else{
+        if(traj_computed)
+            X_des = traject->Pos(t_traj_curr);
+        else{
+            if(!init_pos_acquired)
+            {
+                fk_vel_solver->JntToCart(jnt_pos_vel_kdl,frame_vel_des_kdl,this->seg_names_idx[trajectory_frame]);
+                X_des =  frame_vel_des_kdl.GetFrame();
+                init_pos_acquired = true;
+            }
+        }
+    }
     // Fk -> X last frame
-    jnt_to_jac_solver->JntToJac(jnt_pos_kdl,J_ati_base,this->seg_names_idx["ati_link"]);
-    jdot_solver->JntToJacDot(jnt_pos_vel_kdl,jdot_qdot,this->seg_names_idx["ati_link"]);
-    fk_vel_solver->JntToCart(jnt_pos_vel_kdl,tool_in_base_framevel,this->seg_names_idx["ati_link"]);
+    jnt_to_jac_solver->JntToJac(jnt_pos_kdl,J_ati_base,this->seg_names_idx[trajectory_frame]);
+    jdot_solver->JntToJacDot(jnt_pos_vel_kdl,jdot_qdot,this->seg_names_idx[trajectory_frame]);
+    fk_vel_solver->JntToCart(jnt_pos_vel_kdl,tool_in_base_framevel,this->seg_names_idx[trajectory_frame]);
     X_mes =  tool_in_base_framevel.GetFrame();
     Xd_mes = tool_in_base_framevel.GetTwist();
     
@@ -274,7 +310,7 @@ void CartOptCtrl::updateHook()
     Frame X_tmp(X_curr);
     X_tmp.M = Rotation::Rot(d_err.rot,d_err.rot.Norm()) * X_tmp.M;
     
-    if(0)
+    if(1)
     {
         // Ros pub
        X_curr_msg.header.frame_id = 
@@ -294,7 +330,7 @@ void CartOptCtrl::updateHook()
        port_X_des.write(X_des_msg);
     }
             
-    if(use_xd_des_)
+    if(use_xd_des_ && traj_computed)
         Xd_des = traject->Vel(t_traj_curr);
     else
         SetToZero(Xd_des);
@@ -311,13 +347,9 @@ void CartOptCtrl::updateHook()
     
     Xdd_des.rot = dr + kd_ang*(dd_err.rot);
     
-    if(use_xdd_des_)
-        Xdd_des += traject->Acc(t_traj_curr);
-    
+    if(use_xdd_des_ && traj_computed)
+            Xdd_des += traject->Acc(t_traj_curr);
 
-    
-    
-    
     id_dyn_solver->JntToCoriolis(jnt_pos_kdl,jnt_vel_kdl,coriolis_kdl);
     id_dyn_solver->JntToGravity(jnt_pos_kdl,gravity_kdl);
     id_dyn_solver->JntToMass(jnt_pos_kdl,mass_kdl);
@@ -418,7 +450,7 @@ void CartOptCtrl::updateHook()
     //sendJointTorque(jnt_trq_cmd);
     
     // Incremente traj
-    if(isReadyToStart()){
+    if(isReadyToStart() && traj_computed){
         if( t_traj_curr <= traject->Duration())
             t_traj_curr += static_cast<double>(this->getPeriod());
         else
