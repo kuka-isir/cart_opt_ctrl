@@ -247,10 +247,12 @@ public:
                         jacobian,mass,jdot_qdot,
                         coriolis,gravity,xdd_des );
                   
-
-                  cart_model_solver_.optimize();
-                  cart_model_solver_.getTorque(torque_out,false);
-
+                  
+                  if(cart_model_solver_.optimize())
+                    cart_model_solver_.getTorque(torque_out,false);
+                  else
+                      torque_out.setZero();
+                  
                   port_torque_out.write(torque_out);
             }
             gettimeofday(&tend,NULL);
