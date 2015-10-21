@@ -84,13 +84,13 @@ public:
         return true;
     }
 
-    template<class T> void getTorque(T& torque,bool only_additionnal_torque=false)
+    template<class T> void getTorque(T& torque,bool include_gravity=false)
     {
         try{
             for(unsigned int i=0;i<Ndof && i<torque.rows();++i)
                 torque[i] = tau_v_[i].get(GRB_DoubleAttr_X);
 
-            if(only_additionnal_torque)
+            if(include_gravity==false)
                 for(unsigned int i=0;i<Ndof && i<torque.rows();++i)
                     torque[i] -= this->gravity_[i];
 

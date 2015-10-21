@@ -29,6 +29,7 @@ public:
     static const unsigned int NVars = 2*Ndof;
     CartOptSolverCostFunctor()
     {
+        this->name_ = "Ceres";
         A_.setZero();
         H_.setZero();
         g_.setZero();
@@ -105,7 +106,7 @@ public:
         std::cout <<std::endl;*/
         
     }
-    template<class T> void getTorque(T& torque,bool only_additionnal_torque=false){
+    template<class T> void getTorque(T& torque,bool include_gravity=false){
             for(unsigned int i=0;i<Ndof;++i)
                 torque[i] = x_out[i];
     }

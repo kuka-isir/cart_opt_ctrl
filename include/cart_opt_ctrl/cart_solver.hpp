@@ -28,7 +28,7 @@ public:
     virtual void updateObj()=0;
     virtual bool optimize() = 0;
     virtual void modelUpdate()= 0;
-    template<class T> void getTorque(T& torque,bool only_additionnal_torque=false);
+    template<class T> void getTorque(T& torque,bool include_gravity=true);
     template<class T> void getQdd(T& qdd);
 protected:
     std::string name_;

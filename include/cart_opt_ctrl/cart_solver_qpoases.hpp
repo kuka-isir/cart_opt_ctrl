@@ -78,9 +78,9 @@ public:
         Eigen::Map<Eigen::Matrix<double,NConstrs,NVars,Eigen::RowMajor> >(A, NConstrs,NVars) = A_;
         
     }
-    template<class T> void getTorque(T& torque,bool only_additionnal_torque=false){
+    template<class T> void getTorque(T& torque,bool include_gravity=false){
         if(ret_ == qpOASES::SUCCESSFUL_RETURN)
-            if(only_additionnal_torque==false)
+            if(include_gravity)
                 for(unsigned int i=0;i<Ndof;++i)
                     torque[i] = x_out[i];
             else
@@ -93,7 +93,7 @@ public:
                 qdd[i] = x_out[i+Ndof];
     }
     bool optimize(){
-        nWSR = 100;
+        nWSR = 1E6;
         if(do_init)
         {
             nWSR = 1E6;
