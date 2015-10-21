@@ -31,11 +31,11 @@
     <!-- The level of verbose (never, fatal, critical, error, warning, info, debug, realtime) -->
     <arg name="log_level" default="warning" />
     <!-- Tools -->
-    <arg name="load_base" default="false" />
+    <arg name="load_base" default="true" />
     <arg name="load_ati_sensor" default="true" />
     <arg name="load_calib_tool" default="true" />
     <arg name="load_handle" default="true" />
-
+    <arg name="start_paused" default="false"/>
     <!-- Gazebo -->
     <arg name="gazebo_gui" default="true"/>
     <arg name="launch_gazebo" default="true"/>
@@ -68,6 +68,7 @@
         <arg name="load_handle" value="$(arg load_handle)" />
         <arg name="gazebo_gui" value="$(arg gazebo_gui)"/>
         <arg name="launch_gazebo" value="$(arg launch_gazebo)"/>
+        <arg name="start_paused" value="$(arg start_paused)"/>
     </include>
 
 </launch>
