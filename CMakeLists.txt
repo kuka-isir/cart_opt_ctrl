@@ -5,10 +5,10 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 set(CMAKE_BUILD_TYPE Release)
 
-#find_package(Ceres)
-#if(Ceres_FOUND)
-#    include_directories(${CERES_INCLUDE_DIRS})
-#endif()
+find_package(Ceres)
+if(Ceres_FOUND)
+    include_directories(${CERES_INCLUDE_DIRS})
+endif()
 
 find_package(qpOASES)
 if(qpOASES_FOUND)
@@ -56,11 +56,6 @@ set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMP
 if($ENV{OROCOS_TARGET} STREQUAL "xenomai")
   set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS __XENOMAI__)
 endif()
-
-# Just for Hydro compatibility
-list(REMOVE_ITEM catkin_LIBRARIES lwr_fri_generate_messages_cpp)
-list(REMOVE_ITEM catkin_LIBRARIES lwr_fri_generate_messages_lisp)
-list(REMOVE_ITEM catkin_LIBRARIES lwr_fri_generate_messages_py)
 
 if(GUROBI_FOUND)
   set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS USE_GUROBI)
