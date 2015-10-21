@@ -93,7 +93,7 @@ public:
                 qdd[i] = x_out[i+Ndof];
     }
     bool optimize(){
-        nWSR = 1E6;
+        nWSR = 100;
         if(do_init)
         {
             nWSR = 1E6;
