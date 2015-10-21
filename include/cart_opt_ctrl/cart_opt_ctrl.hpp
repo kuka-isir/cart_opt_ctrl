@@ -74,6 +74,7 @@ namespace lwr{
       RTT::OutputPort<geometry_msgs::PoseStamped> port_X_tmp;
       RTT::OutputPort<geometry_msgs::PoseArray> port_pose_array;
       RTT::InputPort<geometry_msgs::WrenchStamped> port_ftdata;
+      RTT::InputPort<geometry_msgs::Twist> port_spacenav;
       RTT::OutputPort<std_msgs::Float64> port_solver_duration;
       RTT::OutputPort<std_msgs::Float64> port_loop_duration;
       RTT::OutputPort<nav_msgs::Path> port_path_ros;
@@ -94,6 +95,7 @@ namespace lwr{
       RTT::OutputPort<bool> port_optimize_event;
 
     protected:
+      double spacenav_scale_rot,spacenav_scale_trans;
       double kdt_;
       std_msgs::Float32MultiArray qdd_min_ros,qdd_max_ros,qdd_des_ros;
       geometry_msgs::PoseStamped X_curr_msg,X_des_msg,X_tmp_msg;
@@ -145,6 +147,9 @@ namespace lwr{
 private:
       bool model_verbose_;
       double solver_duration;
+      bool use_sim_clock;
+      bool init_pos_acquired;
+      std::string trajectory_frame;
   };
 }
 
@@ -164,6 +169,7 @@ public:
             this->addPort("xdd_des",port_xdd_des).doc("");
             this->addPort("torque_out",port_torque_out).doc("");
             this->ports()->addEventPort( "optimize", port_optimize_event ).doc( "" );
+            this->addProperty("use_sim_clock",use_sim_clock).doc("");
             /*this->addOperation("setMethod",&RTTCartOptSolver::setMethod,this,RTT::OwnThread).doc( "" );
             this->addOperation("setVerbose",&RTTCartOptSolver::setVerbose,this,RTT::OwnThread).doc( "" );
             this->addOperation("setTimeLimit",&RTTCartOptSolver::setTimeLimit,this,RTT::OwnThread).doc( "" );
@@ -209,12 +215,20 @@ public:
             gravity.setZero();
             xdd_des.setZero();
             
+            if(use_sim_clock){
+                RTT::Logger::Instance()->in(getName());
+                RTT::log(RTT::Warning) << "Using ROS Sim Clock" << RTT::endlog();
+                //rtt_rosclock::use_ros_clock_topic();
+                rtt_rosclock::enable_sim();
+                rtt_rosclock::set_sim_clock_activity(this);
+            }
             port_optimize_time.createStream(rtt_roscomm::topic("~"+this->getName()+"/"+cart_model_solver_.getName()+"_duration"));
             return true;
       }
 
       void updateHook()
       {
+            RTT::log(RTT::Debug) << "Solver Update at "<<rtt_rosclock::host_now()<< RTT::endlog();
             //RTT::os::TimeService::ticks timestamp = RTT::os::TimeService::Instance()->getTicks();
             gettimeofday(&tbegin,NULL);
 
@@ -235,7 +249,7 @@ public:
                   
 
                   cart_model_solver_.optimize();
-                  cart_model_solver_.getTorque(torque_out,true);
+                  cart_model_solver_.getTorque(torque_out,false);
 
                   port_torque_out.write(torque_out);
             }
@@ -245,6 +259,7 @@ public:
             //elapsed_ros.data = elapsed;
             port_optimize_time.write(elapsed_ros);
             //this->trigger();
+            //usleep(1*1E6);
       }
       
       RTT::InputPort<Eigen::VectorXd> port_q;
@@ -273,6 +288,7 @@ public:
       Eigen::VectorXd xdd_des;
       ros::Time start_t;
       std_msgs::Float64 elapsed_ros;
+      bool use_sim_clock;
 
 protected:
       lwr::LWRCartOptSolver<CartOptSolverqpOASES> cart_model_solver_;
