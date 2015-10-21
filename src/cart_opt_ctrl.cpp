@@ -29,8 +29,8 @@ kdt_(5.0),
 init_pos_acquired(false),
 use_sim_clock(false),
 trajectory_frame("link_7"),
-spacenav_scale_trans(0.01),
-spacenav_scale_rot(0.01),
+spacenav_scale_trans(0.001),
+spacenav_scale_rot(0.001),
 RTTLWRAbstract(name)
 {
 //     this->ports()->addPort("PathROS",port_path_ros).doc("");
@@ -277,7 +277,7 @@ void CartOptCtrl::updateHook()
     if(port_spacenav.read(spacenav_tw) != RTT::NoData)
     {
         // Bypassing everybody :)
-        X_des.M = KDL::Rotation::RPY(spacenav_scale_rot * spacenav_tw.angular.x,
+        X_des.M = X_des.M * KDL::Rotation::RPY(spacenav_scale_rot * spacenav_tw.angular.x,
                                               spacenav_scale_rot * spacenav_tw.angular.y,
                                               spacenav_scale_rot * spacenav_tw.angular.z);
         X_des.p = X_des.p + KDL::Vector(spacenav_scale_trans * spacenav_tw.linear.x,
