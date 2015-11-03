@@ -19,7 +19,6 @@ use_coriolis_(true),
 d_ang_max_(100.0),
 dw_max_(0.5),
 use_xdd_des_(true),
-use_mass_sqrt_(false),
 elapsed(0),
 use_xd_des_(true),
 use_ft_sensor_(false),
@@ -29,8 +28,9 @@ kdt_(5.0),
 init_pos_acquired(false),
 use_sim_clock(false),
 trajectory_frame("link_7"),
-spacenav_scale_trans(0.001),
-spacenav_scale_rot(0.001),
+spacenav_scale_trans(0.0001),
+spacenav_scale_rot(0.0001),
+n_updates_(0),
 RTTLWRAbstract(name)
 {
 //     this->ports()->addPort("PathROS",port_path_ros).doc("");
@@ -61,7 +61,6 @@ RTTLWRAbstract(name)
     this->provides("debug")->addAttribute("solver_duration",solver_duration);
     this->provides("debug")->addAttribute("UpdateHookDuration",elapsed);
     this->provides("debug")->addAttribute("WrenchInBase",F_ext);
-    this->addProperty("use_mass_sqrt",use_mass_sqrt_);
     this->addProperty("use_ft_sensor",use_ft_sensor_);
     this->addProperty("use_sim_clock",use_sim_clock);
 // Async Optimize
@@ -253,8 +252,9 @@ void CartOptCtrl::publishTrajectory()
 }*/
 void CartOptCtrl::updateHook()
 {
+    static bool first_loop;
     RTT::log(RTT::Debug) << "CartOptCtrl Update at "<<rtt_rosclock::host_now()<< RTT::endlog();
-    if(!updateState())
+    if(!updateState() /*|| !isCommandMode()*/)
         return;
 
 #ifdef __XENOMAI__
@@ -272,6 +272,18 @@ void CartOptCtrl::updateHook()
     static Frame X_des,X_mes;
     static Twist Xdd_des,Xd_mes,Xd_des;
     
+    // Fk -> X last frame
+    jnt_to_jac_solver->JntToJac(jnt_pos_kdl,J_ati_base,this->seg_names_idx[trajectory_frame]);
+    jdot_solver->JntToJacDot(jnt_pos_vel_kdl,jdot_qdot,this->seg_names_idx[trajectory_frame]);
+    fk_vel_solver->JntToCart(jnt_pos_vel_kdl,tool_in_base_framevel,this->seg_names_idx[trajectory_frame]);
+    X_mes =  tool_in_base_framevel.GetFrame();
+    Xd_mes = tool_in_base_framevel.GetTwist();
+
+    if(n_updates_ == 0)
+    {
+        X_des = X_mes;
+    }
+
 
     geometry_msgs::Twist spacenav_tw;
     if(port_spacenav.read(spacenav_tw) != RTT::NoData)
@@ -295,12 +307,7 @@ void CartOptCtrl::updateHook()
             }
         }
     }
-    // Fk -> X last frame
-    jnt_to_jac_solver->JntToJac(jnt_pos_kdl,J_ati_base,this->seg_names_idx[trajectory_frame]);
-    jdot_solver->JntToJacDot(jnt_pos_vel_kdl,jdot_qdot,this->seg_names_idx[trajectory_frame]);
-    fk_vel_solver->JntToCart(jnt_pos_vel_kdl,tool_in_base_framevel,this->seg_names_idx[trajectory_frame]);
-    X_mes =  tool_in_base_framevel.GetFrame();
-    Xd_mes = tool_in_base_framevel.GetTwist();
+
     
        
     Frame X_curr = X_mes;
@@ -468,6 +475,7 @@ void CartOptCtrl::updateHook()
 #endif
    // ros::Duration t_elapsed = rtt_rosclock::host_now() - t_start;
   //  elapsed = t_elapsed.toSec();
+    n_updates_++;
 }
 
 }
