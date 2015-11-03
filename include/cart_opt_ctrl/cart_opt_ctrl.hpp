@@ -150,13 +150,17 @@ private:
       bool use_sim_clock;
       bool init_pos_acquired;
       std::string trajectory_frame;
+      int n_updates_;
   };
 }
 
 class RTTCartOptSolver: public RTT::TaskContext
 {
 public:
-      RTTCartOptSolver(const std::string& name): RTT::TaskContext(name)
+      RTTCartOptSolver(const std::string& name): 
+      use_sim_clock(false),
+      n_updates_(0),
+      RTT::TaskContext(name)
       {
             this->addPort("q",port_q).doc("");
             this->addPort("qdot",port_qdot).doc("");
@@ -230,10 +234,11 @@ public:
       {
             RTT::log(RTT::Debug) << "Solver Update at "<<rtt_rosclock::host_now()<< RTT::endlog();
             //RTT::os::TimeService::ticks timestamp = RTT::os::TimeService::Instance()->getTicks();
-            gettimeofday(&tbegin,NULL);
+            if(use_sim_clock)
+              gettimeofday(&tbegin,NULL);
 
             RTT::FlowStatus fs = port_q.readNewest(q);
-            if(fs != RTT::NoData){
+            if(fs == RTT::NewData){
                   port_qdot.readNewest(qdot);
                   port_jacobian.readNewest(jacobian);
                   port_mass.readNewest(mass);
@@ -248,20 +253,23 @@ public:
                         coriolis,gravity,xdd_des );
                   
                   
-                  if(cart_model_solver_.optimize())
+                  if(cart_model_solver_.optimize() && n_updates_ >= 0)
                     cart_model_solver_.getTorque(torque_out,false);
                   else
                       torque_out.setZero();
                   
                   port_torque_out.write(torque_out);
             }
-            gettimeofday(&tend,NULL);
-            elapsed_ros.data = 1000.*(tend.tv_sec-tbegin.tv_sec)+(tend.tv_usec-tbegin.tv_usec)/1000.;
-            //RTT::Seconds elapsed = RTT::os::TimeService::Instance()->secondsSince( timestamp );
-            //elapsed_ros.data = elapsed;
-            port_optimize_time.write(elapsed_ros);
+            if(use_sim_clock){
+              gettimeofday(&tend,NULL);
+              elapsed_ros.data = 1000.*(tend.tv_sec-tbegin.tv_sec)+(tend.tv_usec-tbegin.tv_usec)/1000.;
+              //RTT::Seconds elapsed = RTT::os::TimeService::Instance()->secondsSince( timestamp );
+              //elapsed_ros.data = elapsed;
+              port_optimize_time.write(elapsed_ros);
+            }
             //this->trigger();
             //usleep(1*1E6);
+            n_updates_++;
       }
       
       RTT::InputPort<Eigen::VectorXd> port_q;
@@ -291,6 +299,7 @@ public:
       ros::Time start_t;
       std_msgs::Float64 elapsed_ros;
       bool use_sim_clock;
+      int n_updates_;
 
 protected:
       lwr::LWRCartOptSolver<CartOptSolverqpOASES> cart_model_solver_;
