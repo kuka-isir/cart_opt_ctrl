@@ -18,6 +18,8 @@ endif()
 find_package(GUROBI)
 if(GUROBI_FOUND)
     include_directories(${GUROBI_INCLUDE_DIRS})
+else()
+    set(GUROBI_LIBRARIES "")
 endif()
 
 find_package(catkin REQUIRED COMPONENTS
