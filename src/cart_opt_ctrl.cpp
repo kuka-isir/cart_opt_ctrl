@@ -1,5 +1,6 @@
 #include "cart_opt_ctrl/cart_opt_ctrl.hpp"
 
+
 namespace lwr{
 using namespace RTT;
 using namespace KDL;
@@ -21,7 +22,7 @@ dw_max_(0.5),
 use_xdd_des_(true),
 elapsed(0),
 use_xd_des_(true),
-use_ft_sensor_(false),
+use_ft_sensor_(true),
 model_verbose_(false),
 jacobian_solver_type_(WDL_SOLVER),
 kdt_(5.0),
@@ -37,7 +38,7 @@ RTTLWRAbstract(name)
     /*this->ports()->addPort("X_curr",port_X_curr).doc("");
     this->ports()->addPort("X_tmp",port_X_tmp).doc("");
     this->ports()->addPort("X_des",port_X_des).doc("");*/
-    this->ports()->addPort("FTData",port_ftdata).doc("The ATI F/T Sensor Input");
+    this->ports()->addPort("ati_ft_data_in",port_ftdata).doc("The ATI F/T Sensor Input");
     this->addOperation("publishTrajectory",&CartOptCtrl::publishTrajectory,this,RTT::OwnThread);
     this->addOperation("computeTrajectory",&CartOptCtrl::computeTrajectory,this,RTT::OwnThread);
     this->addProperty("kp_lin",kp_lin);
@@ -74,6 +75,7 @@ RTTLWRAbstract(name)
             this->addPort("gravity",port_gravity).doc("");
             this->addPort("xdd_des",port_xdd_des).doc("");
             this->addPort( "optimize", port_optimize_event ).doc( "" );
+            this->addPort( "add_torque", port_add_torque ).doc( "" );
 }
 
 bool CartOptCtrl::configureHook()
@@ -135,6 +137,7 @@ bool CartOptCtrl::configureHook()
     jdot.resize(kdl_chain.getNrOfSegments());
     J_ati_base.resize(kdl_chain.getNrOfJoints());
     J_ee_base.resize(kdl_chain.getNrOfJoints());
+    jnt_acc_kdl.resize(kdl_chain.getNrOfJoints());
     // Get initial pose   
      
     mass_inv.resize(kdl_chain.getNrOfJoints(),kdl_chain.getNrOfJoints());
@@ -170,10 +173,10 @@ bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,c
     log(Warning) << "Computing Trajectory" << endlog();
     try
     {
-        
+
         fk_vel_solver->JntToCart(jnt_pos_vel_kdl,frame_vel_des_kdl,this->seg_names_idx[trajectory_frame]);
         frame_des_kdl =  frame_vel_des_kdl.GetFrame();
-       
+
         path = new Path_RoundedComposite(radius,eqradius,new RotationalInterpolation_SingleAxis());
         path->Add(frame_des_kdl);
         path->Add(Frame(Rotation::RPY(99.*deg2rad,        -17.*deg2rad,     -101.*deg2rad),   Vector(-.467,-.448,.576)));
@@ -184,24 +187,22 @@ bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,c
         path->Add(frame_des_kdl);
         // always call Finish() at the end, otherwise the last segment will not be added.
         path->Finish();
-        
+
         velpref = new VelocityProfile_Trap(vmax,accmax);
-        velpref->SetProfile(0,path->PathLength());  
+        velpref->SetProfile(0,path->PathLength());
         traject = new Trajectory_Segment(path, velpref);
-        
+
         ctraject = new Trajectory_Composite();
         ctraject->Add(traject);
         ctraject->Add(new Trajectory_Stationary(1.0,frame_des_kdl));
         traj_computed = true;
-        
+
     } catch(KDL::Error& error) {
             std::cout <<"I encountered this error : " << error.Description() << endlog();
             std::cout << "with the following type " << error.GetType() << endlog();
             return false;
     }
-    
-    log(Warning) << "Trajectory computed ! " << endlog();
-    publishTrajectory();
+
     return true;
 }
 
@@ -214,13 +215,13 @@ void CartOptCtrl::publishTrajectory()
     path_ros.header.frame_id = root_link;
     log(Debug) << "Creating Path" << endlog();
     geometry_msgs::PoseArray pose_array;
-    for (double t=0.0; t <= traject->Duration(); t+= 0.1) {
+    for (double t=0.0; t <= ctraject->Duration(); t+= 0.1) {
             Frame current_pose;
             Twist current_vel,current_acc;
             
-            current_pose = traject->Pos(t);
-            current_vel = traject->Vel(t);
-            current_acc = traject->Acc(t);
+            current_pose = ctraject->Pos(t);
+            current_vel = ctraject->Vel(t);
+            current_acc = ctraject->Acc(t);
                         
             geometry_msgs::Pose pose;
             geometry_msgs::PoseStamped pose_st;
@@ -297,7 +298,7 @@ void CartOptCtrl::updateHook()
                                                   spacenav_scale_trans * spacenav_tw.linear.z);
     }else{
         if(traj_computed)
-            X_des = traject->Pos(t_traj_curr);
+            X_des = ctraject->Pos(t_traj_curr);
         else{
             if(!init_pos_acquired)
             {
@@ -338,7 +339,7 @@ void CartOptCtrl::updateHook()
     }
             
     if(use_xd_des_ && traj_computed)
-        Xd_des = traject->Vel(t_traj_curr);
+        Xd_des = ctraject->Vel(t_traj_curr);
     else
         SetToZero(Xd_des);
     Twist dd_err = diff(Xd_mes,Xd_des);
@@ -355,7 +356,7 @@ void CartOptCtrl::updateHook()
     Xdd_des.rot = dr + kd_ang*(dd_err.rot);
     
     if(use_xdd_des_ && traj_computed)
-            Xdd_des += traject->Acc(t_traj_curr);
+            Xdd_des += ctraject->Acc(t_traj_curr);
 
     id_dyn_solver->JntToCoriolis(jnt_pos_kdl,jnt_vel_kdl,coriolis_kdl);
     id_dyn_solver->JntToGravity(jnt_pos_kdl,gravity_kdl);
@@ -409,6 +410,28 @@ void CartOptCtrl::updateHook()
                                     jnt_trq_cmd);
 
         cart_model_solver_.getQddBounds(qdd_min_ros.data,qdd_max_ros.data,qdd_des_ros.data);*/
+        
+        
+        
+        
+        if(use_ft_sensor_ && port_ftdata.read(wrench_msg) != RTT::NoData){
+            // remove B(q,qdot)
+            jnt_vel_kdl.data.setZero();
+            jnt_acc_kdl.data.setZero();
+            // Get the Wrench in the last segment's frame
+            tf::wrenchMsgToKDL(wrench_msg.wrench,wrench_kdl);
+            f_ext_kdl.back() = wrench_kdl;
+            // Get The full dynamics with external forces
+            id_rne_solver->CartToJnt(jnt_pos_kdl,jnt_vel_kdl,jnt_acc_kdl,f_ext_kdl,jnt_trq_kdl);
+            // Get Joint Gravity torque
+            //id_dyn_solver->JntToGravity(jnt_pos_kdl,gravity_kdl);
+            // remove G(q)
+            jnt_trq_cmd = jnt_trq_kdl.data - gravity_kdl.data;
+            //RTT::log(RTT::Debug) << "CartOptCtrl add_torque "<<jnt_trq_cmd << "due to wrench "<<wrench_kdl<< RTT::endlog();
+            port_add_torque.write(jnt_trq_cmd);
+        }
+    
+    
 #ifndef __XENOMAI__
         gettimeofday(&tend,NULL);
 #else
@@ -458,7 +481,7 @@ void CartOptCtrl::updateHook()
     
     // Incremente traj
     if(isReadyToStart() && traj_computed){
-        if( t_traj_curr <= traject->Duration())
+        if( t_traj_curr <= ctraject->Duration())
             t_traj_curr += static_cast<double>(this->getPeriod());
         else
             t_traj_curr = 0.0;

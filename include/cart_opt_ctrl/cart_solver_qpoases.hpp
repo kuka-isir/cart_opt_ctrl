@@ -1,6 +1,5 @@
 #ifndef __CART_SOLVER_QPOASES_HPP__
 #define __CART_SOLVER_QPOASES_HPP__
-#include <cart_opt_ctrl/cart_solver.hpp>
 #include <cart_opt_ctrl/cart_problem.hpp>
 #include <qpOASES.hpp>
 #include <iostream>
@@ -8,7 +7,7 @@
 USING_NAMESPACE_QPOASES
 
 template<unsigned int Ndof>
-class CartOptSolverqpOASES: public CartOptSolver<Ndof>
+class CartOptSolverqpOASES: public CartProblem<Ndof>
 {
 public:
     static const unsigned int NConstrs = Ndof;

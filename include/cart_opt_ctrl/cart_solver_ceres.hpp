@@ -1,6 +1,5 @@
 #ifndef __CART_SOLVER_CERES_HPP__
 #define __CART_SOLVER_CERES_HPP__
-#include <cart_opt_ctrl/cart_solver.hpp>
 #include <cart_opt_ctrl/cart_problem.hpp>
 #include <ceres/ceres.h>
 
@@ -22,7 +21,7 @@ protected:
 
 
 template<unsigned int Ndof>
-class CartOptSolverCostFunctor: public CartOptSolver<Ndof>
+class CartOptSolverCostFunctor: public CartProblem<Ndof>
 {
 public:
     static const unsigned int NConstrs = Ndof;

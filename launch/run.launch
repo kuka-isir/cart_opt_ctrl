@@ -11,16 +11,16 @@
     <arg name="ft_calibration_index" default="-1"/>
     <!-- The name of the Wrench frame -->
     <arg name="ft_frame" default="ati_link"/>
-    
+
     <!-- The parameters that the ft_component sensor will get -->
     <rosparam ns="ft_sensor" subst_value="true">
         ip: $(arg ft_ip)
         calibration_index: $(arg ft_calibration_index)
         frame: $(arg ft_frame)
     </rosparam>
-    
+
 <!--============ LWR Runner script Params ========-->
-    
+
     <!-- The end effector frame (you'll be able to use frames <= tip_link for cartesian position, jacobians etc.) -->
     <arg name="tip_link" default="ati_link"/>
     <!-- Run Simulated robot (need to 'roslaunch rtt_lwr_gazebo lwr_gazebo.launch' first) -->
@@ -68,7 +68,7 @@
         spacenav_scale_rot: 0.0001
     </rosparam>
 
-<!--============ LWR Runner script ===============-->  
+<!--============ LWR Runner script ===============-->
 
     <include file="$(find lwr_launch)/launch/run.launch">
         <arg name="sim" value="$(arg sim)" />
@@ -91,4 +91,3 @@
     </include>
 
 </launch>
-
