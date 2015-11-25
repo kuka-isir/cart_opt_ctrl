@@ -10,10 +10,10 @@
 #define to_string( x ) dynamic_cast< std::ostringstream & >( \
         ( std::ostringstream() << std::dec << x ) ).str()
         
-#include <cart_opt_ctrl/cart_solver.hpp>
+#include <cart_opt_ctrl/cart_problem.hpp>
 
 template<unsigned int Ndof>
-class CartOptSolverGurobi: public CartOptSolver<Ndof>
+class CartOptSolverGurobi: public CartProblem<Ndof>
 {
 public:
     CartOptSolverGurobi():

@@ -64,7 +64,7 @@ namespace lwr{
   class CartOptCtrl : public RTTLWRAbstract{
     public:
       CartOptCtrl(const std::string& name);
-      virtual ~CartOptCtrl(){delete ctraject;};
+      virtual ~CartOptCtrl(){/*delete ctraject;*/};
       bool computeTrajectory(const double radius,const double eqradius,const double vmax=0.02, const double accmax=0.1);
       void updateHook();
       bool configureHook();
@@ -83,6 +83,7 @@ namespace lwr{
       RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_des;
         
       // Async update
+      RTT::OutputPort<Eigen::VectorXd> port_add_torque;
       RTT::OutputPort<Eigen::VectorXd> port_q;
       RTT::OutputPort<Eigen::VectorXd> port_qdot;
       RTT::OutputPort<double> port_dt;
@@ -111,10 +112,12 @@ namespace lwr{
       Eigen::Matrix<double,6,1> F_ext;
       KDL::Twist cart_twist_des_kdl;
 
-      KDL::Path_RoundedComposite* path;
-      KDL::VelocityProfile* velpref;
-      KDL::Trajectory* traject;
-      KDL::Trajectory_Composite* ctraject;
+      boost::scoped_ptr<KDL::Path_RoundedComposite> path;
+      boost::scoped_ptr<KDL::VelocityProfile> velpref;
+      boost::scoped_ptr<KDL::Trajectory> traject;
+      boost::scoped_ptr<KDL::Trajectory_Stationary> trajectory_stationary;
+      boost::scoped_ptr<KDL::Trajectory_Composite> ctraject;
+      
       void publishTrajectory();
       boost::scoped_ptr<KDL::ChainJntToJacDotSolver> jdot_solver;
       KDL::Jacobian jdot,J_ati_base,J_ee_base;
@@ -139,7 +142,6 @@ namespace lwr{
       double elapsed,dw_max_;
       bool use_mass_sqrt_;
       bool use_xd_des_;
-      geometry_msgs::WrenchStamped ft_data;
       Eigen::Matrix<double,6,1> ft_wrench;
       KDL::Wrench ft_wrench_kdl;
       Eigen::Matrix<double,6,1> xdd_des_;
@@ -150,6 +152,7 @@ private:
       bool use_sim_clock;
       bool init_pos_acquired;
       std::string trajectory_frame;
+      geometry_msgs::WrenchStamped wrench_msg;
   };
 }
 
@@ -168,6 +171,7 @@ public:
             this->addPort("gravity",port_gravity).doc("");
             this->addPort("xdd_des",port_xdd_des).doc("");
             this->addPort("torque_out",port_torque_out).doc("");
+            this->addPort("add_torque",port_add_torque).doc("");
             this->ports()->addEventPort( "optimize", port_optimize_event ).doc( "" );
             this->addProperty("use_sim_clock",use_sim_clock).doc("");
             /*this->addOperation("setMethod",&RTTCartOptSolver::setMethod,this,RTT::OwnThread).doc( "" );
@@ -204,7 +208,9 @@ public:
             gravity.resize(LBR_MNJ);
             xdd_des.resize(6);
             torque_out.resize(LBR_MNJ);
-
+            add_torque.resize(LBR_MNJ);
+            
+            add_torque.setZero();
             torque_out.setZero();
             q.setZero();
             qdot.setZero();
@@ -242,10 +248,12 @@ public:
                   port_coriolis.readNewest(coriolis);
                   port_gravity.readNewest(gravity);
                   port_xdd_des.readNewest(xdd_des);
+                  add_torque.setZero();
+                  port_add_torque.readNewest(add_torque);
 
                   cart_model_solver_.update(q,qdot,dt,
                         jacobian,mass,jdot_qdot,
-                        coriolis,gravity,xdd_des );
+                        coriolis,gravity,add_torque,xdd_des );
                   
                   
                   if(cart_model_solver_.optimize())
@@ -263,7 +271,7 @@ public:
             //this->trigger();
             //usleep(1*1E6);
       }
-      
+      RTT::InputPort<Eigen::VectorXd> port_add_torque;
       RTT::InputPort<Eigen::VectorXd> port_q;
       RTT::InputPort<Eigen::VectorXd> port_qdot;
       RTT::InputPort<double> port_dt;
@@ -281,6 +289,7 @@ public:
       Eigen::VectorXd torque_out;
       Eigen::VectorXd q;
       Eigen::VectorXd qdot;
+      Eigen::VectorXd add_torque;
       double dt;
       Eigen::MatrixXd jacobian;
       Eigen::MatrixXd mass;

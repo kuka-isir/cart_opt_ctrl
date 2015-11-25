@@ -31,6 +31,8 @@ connect("CartOptCtrl.xdd_des","Solver.xdd_des",cp)
 connect("CartOptCtrl.optimize","Solver.optimize",cp)
 connect("Solver.torque_out","lwr_sim.JointTorqueCommand",cp)
 
+stream("CartOptCtrl.ati_ft_data_in", ros.comm.topic("ft_sensor/wrench"))
+connect("CartOptCtrl.add_torque","Solver.add_torque",cp)
 
 
 print.ln("Configuring Solver")

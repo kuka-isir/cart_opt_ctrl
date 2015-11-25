@@ -23,8 +23,8 @@ const double LWRLimits::joint_torque_limit_Nm[LBR_MNJ] = { 200,200,100,100,100,3
 
         
 namespace lwr{
-template<template<unsigned int> class Solver,unsigned int Ndof=LBR_MNJ>
-class LWRCartOptSolver : public Solver<Ndof>
+template<template<unsigned int> class CartProblem,unsigned int Ndof=LBR_MNJ>
+class LWRCartOptSolver : public CartProblem<Ndof>
 {
 public:
     LWRCartOptSolver():
@@ -41,11 +41,12 @@ public:
                 const Eigen::Matrix<double,6,1>& jdot_qdot,
                 const Eigen::Matrix<double,LBR_MNJ,1>& coriolis,
                 const Eigen::Matrix<double,LBR_MNJ,1>& gravity,
+                const Eigen::Matrix<double,LBR_MNJ,1>& add_torque,
                 const Eigen::Matrix<double,6,1>& xdd_des
                 )
     {
         updateBounds(q,qdot,dt_sec_since_last_optimize,gravity);
-        Solver<Ndof>::update(jacobian,mass,jdot_qdot,coriolis,gravity,xdd_des);
+        CartProblem<Ndof>::update(jacobian,mass,jdot_qdot,coriolis,gravity,add_torque,xdd_des);
     }
     //bool optimize(){return gurobi::CartSolverGurobi::optimise();}
     template<class T_Array,class T2_Array,class T3_Array>
