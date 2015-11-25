@@ -384,7 +384,7 @@ void CartOptCtrl::updateHook()
             port_coriolis.write(coriolis_kdl.data);
             port_gravity.write(gravity_kdl.data);
             port_xdd_des.write(xdd_des_);
-            port_optimize_event.write(true);
+
     /*update_(jnt_pos,
                                     jnt_vel,
                                     3.*static_cast<double>(getPeriod()),
@@ -430,6 +430,7 @@ void CartOptCtrl::updateHook()
             //RTT::log(RTT::Debug) << "CartOptCtrl add_torque "<<jnt_trq_cmd << "due to wrench "<<wrench_kdl<< RTT::endlog();
             port_add_torque.write(jnt_trq_cmd);
         }
+        port_optimize_event.write(true); // let's go !
     
     
 #ifndef __XENOMAI__

@@ -60,7 +60,7 @@ protected:
         gravity_ = gravity;
         mass_inv_ = mass.inverse();
         a_ = jacobian * mass_inv_;
-        b_qqd_ = coriolis + gravity + add_torque;
+        b_qqd_ = coriolis + gravity;
         cte_ = jdot_qdot.transpose() - (a_ * b_qqd_).transpose() - xdd_des.transpose();
         q_ = 2. * (cte_  * a_);
         Q_ = a_.transpose() * a_;

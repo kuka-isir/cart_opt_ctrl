@@ -264,6 +264,8 @@ public:
                   else
                       torque_out.setZero();
                   
+                  // TMP \\
+                  torque_out +=add_torque;
                   port_torque_out.write(torque_out);
             }
             if(use_sim_clock){
