@@ -95,7 +95,7 @@ public:
         nWSR = 100;
         if(do_init)
         {
-            nWSR = 1E6;
+            //nWSR = 1E6;
             ret_ = cart_prob.init( H,g,A,lb,ub,eqA,eqA, nWSR,&cpulimit);
             do_init = false;
         }else
@@ -110,7 +110,7 @@ public:
     Eigen::Matrix<double,NVars,1> g_;
     real_t lb[NVars],ub[NVars];
     real_t lbA[NConstrs],ubA[NConstrs],eqA[NVars];
-    int_t nWSR;
+    int nWSR;
     real_t cpulimit;
     bool do_init;
     real_t x_out[NVars];

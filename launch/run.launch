@@ -29,7 +29,7 @@
     <!-- Launch rviz -->
     <arg name="rviz" default="true" />
     <!-- The level of verbose (never, fatal, critical, error, warning, info, debug, realtime) -->
-    <arg name="log_level" default="warning" />
+    <arg name="log_level" default="info" />
     <!-- Tools -->
     <arg name="load_base" default="true" />
     <arg name="load_ati_sensor" default="true" />
@@ -40,13 +40,29 @@
     <arg name="gazebo_gui" default="true"/>
     <arg name="launch_gazebo" default="true"/>
 <!--============ CartOptCtrl Params ============-->
-
-    <!-- Some parameter -->
-    <arg name="damping" default="8.0"/>
-
+    
     <!-- The parameters that the CartOptCtrl sensor will get -->
-    <rosparam ns="CartOptCtrl" subst_value="true">
-        debug_mode: false
+    <rosparam unless="$(arg sim)" ns="CartOptCtrl" subst_value="true">
+        kp_lin: 600.0
+        kd_lin: 10.0
+        kp_ang: 250.0
+        kd_ang: 5.0
+        trajectory_frame: ati_link
+        dx_ang_max: 100.0
+        dw_max: 0.1
+        use_jdot_qdot: true
+        use_f_ext: true
+        use_coriolis: true
+        use_xd_des: true
+        use_coriolis: true
+        use_xdd_des: true
+        use_ft_sensor: true
+        use_damping: false
+        use_nso: false
+        kp_ref: 100.0
+        damping: 10.0
+        spacenav_scale_trans: 0.0001
+        spacenav_scale_rot: 0.0001
     </rosparam>
 
 <!--============ LWR Runner script ===============-->

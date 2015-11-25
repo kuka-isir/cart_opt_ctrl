@@ -20,7 +20,6 @@ use_coriolis_(true),
 d_ang_max_(100.0),
 dw_max_(0.5),
 use_xdd_des_(true),
-use_mass_sqrt_(false),
 elapsed(0),
 use_xd_des_(true),
 use_ft_sensor_(true),
@@ -30,8 +29,9 @@ kdt_(5.0),
 init_pos_acquired(false),
 use_sim_clock(false),
 trajectory_frame("link_7"),
-spacenav_scale_trans(0.001),
-spacenav_scale_rot(0.001),
+spacenav_scale_trans(0.0001),
+spacenav_scale_rot(0.0001),
+n_updates_(0),
 RTTLWRAbstract(name)
 {
 //     this->ports()->addPort("PathROS",port_path_ros).doc("");
@@ -62,7 +62,6 @@ RTTLWRAbstract(name)
     this->provides("debug")->addAttribute("solver_duration",solver_duration);
     this->provides("debug")->addAttribute("UpdateHookDuration",elapsed);
     this->provides("debug")->addAttribute("WrenchInBase",F_ext);
-    this->addProperty("use_mass_sqrt",use_mass_sqrt_);
     this->addProperty("use_ft_sensor",use_ft_sensor_);
     this->addProperty("use_sim_clock",use_sim_clock);
 // Async Optimize
@@ -174,34 +173,30 @@ bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,c
     log(Warning) << "Computing Trajectory" << endlog();
     try
     {
-        
+
         fk_vel_solver->JntToCart(jnt_pos_vel_kdl,frame_vel_des_kdl,this->seg_names_idx[trajectory_frame]);
         frame_des_kdl =  frame_vel_des_kdl.GetFrame();
-        log(Warning) << "reset path " << endlog();
-        path.reset(new KDL::Path_RoundedComposite(radius,eqradius,new KDL::RotationalInterpolation_SingleAxis()));
-        log(Warning) << "add frames" << endlog();
+
+        path = new Path_RoundedComposite(radius,eqradius,new RotationalInterpolation_SingleAxis());
         path->Add(frame_des_kdl);
         path->Add(Frame(Rotation::RPY(99.*deg2rad,        -17.*deg2rad,     -101.*deg2rad),   Vector(-.467,-.448,.576)));
         path->Add(Frame(Rotation::RPY(99.*deg2rad,        -17.*deg2rad,     -101.*deg2rad),   Vector(-.467,-.448,.376)));
+        /*path->Add(Frame(Rotation::RPY(88.*deg2rad,        -4.*deg2rad,     -36.*deg2rad),   Vector(-.372,-.527,.505)));
+        path->Add(Frame(Rotation::RPY(91.0*deg2rad,         -3.*deg2rad,   -28.*deg2rad), Vector(-.198,-.657,.695)));
+        path->Add(Frame(Rotation::RPY(89.0*deg2rad,       -17.*deg2rad,   -32.*deg2rad), Vector(-.219,-.725,.404)));*/
         path->Add(frame_des_kdl);
+        // always call Finish() at the end, otherwise the last segment will not be added.
         path->Finish();
-        log(Warning) << "reset vel" << endlog();
-        velpref.reset(new KDL::VelocityProfile_Trap(vmax,accmax));
+
+        velpref = new VelocityProfile_Trap(vmax,accmax);
         velpref->SetProfile(0,path->PathLength());
-        log(Warning) << "reset ctraject" << endlog();
-        if(ctraject)
-            ctraject->Destroy();
-        ctraject.reset(new KDL::Trajectory_Composite());
-        log(Warning) << "add traj" << endlog();
-        ctraject->Add(new KDL::Trajectory_Segment(path.get(),velpref.get()));
-        log(Warning) << "a" << endlog();
-        ctraject->Add(new KDL::Trajectory_Stationary(1.0,frame_des_kdl));
-        
+        traject = new Trajectory_Segment(path, velpref);
+
+        ctraject = new Trajectory_Composite();
+        ctraject->Add(traject);
+        ctraject->Add(new Trajectory_Stationary(1.0,frame_des_kdl));
         traj_computed = true;
-        this->t_traj_curr = 0;
-        log(Warning) << "Trajectory computed ! " << endlog();
-        publishTrajectory();
-        
+
     } catch(KDL::Error& error) {
             std::cout <<"I encountered this error : " << error.Description() << endlog();
             std::cout << "with the following type " << error.GetType() << endlog();
@@ -258,8 +253,9 @@ void CartOptCtrl::publishTrajectory()
 }*/
 void CartOptCtrl::updateHook()
 {
+    static bool first_loop;
     RTT::log(RTT::Debug) << "CartOptCtrl Update at "<<rtt_rosclock::host_now()<< RTT::endlog();
-    if(!updateState())
+    if(!updateState() /*|| !isCommandMode()*/)
         return;
 
 #ifdef __XENOMAI__
@@ -277,6 +273,18 @@ void CartOptCtrl::updateHook()
     static Frame X_des,X_mes;
     static Twist Xdd_des,Xd_mes,Xd_des;
     
+    // Fk -> X last frame
+    jnt_to_jac_solver->JntToJac(jnt_pos_kdl,J_ati_base,this->seg_names_idx[trajectory_frame]);
+    jdot_solver->JntToJacDot(jnt_pos_vel_kdl,jdot_qdot,this->seg_names_idx[trajectory_frame]);
+    fk_vel_solver->JntToCart(jnt_pos_vel_kdl,tool_in_base_framevel,this->seg_names_idx[trajectory_frame]);
+    X_mes =  tool_in_base_framevel.GetFrame();
+    Xd_mes = tool_in_base_framevel.GetTwist();
+
+    if(n_updates_ == 0)
+    {
+        X_des = X_mes;
+    }
+
 
     geometry_msgs::Twist spacenav_tw;
     if(port_spacenav.read(spacenav_tw) != RTT::NoData)
@@ -300,12 +308,7 @@ void CartOptCtrl::updateHook()
             }
         }
     }
-    // Fk -> X last frame
-    jnt_to_jac_solver->JntToJac(jnt_pos_kdl,J_ati_base,this->seg_names_idx[trajectory_frame]);
-    jdot_solver->JntToJacDot(jnt_pos_vel_kdl,jdot_qdot,this->seg_names_idx[trajectory_frame]);
-    fk_vel_solver->JntToCart(jnt_pos_vel_kdl,tool_in_base_framevel,this->seg_names_idx[trajectory_frame]);
-    X_mes =  tool_in_base_framevel.GetFrame();
-    Xd_mes = tool_in_base_framevel.GetTwist();
+
     
        
     Frame X_curr = X_mes;
@@ -495,6 +498,7 @@ void CartOptCtrl::updateHook()
 #endif
    // ros::Duration t_elapsed = rtt_rosclock::host_now() - t_start;
   //  elapsed = t_elapsed.toSec();
+    n_updates_++;
 }
 
 }
