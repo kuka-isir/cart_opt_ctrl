@@ -111,7 +111,7 @@ public:
     Eigen::Matrix<double,NVars,1> g_;
     real_t lb[NVars],ub[NVars];
     real_t lbA[NConstrs],ubA[NConstrs],eqA[NVars];
-    int_t nWSR;
+    int nWSR;
     real_t cpulimit;
     bool do_init;
     real_t x_out[NVars];

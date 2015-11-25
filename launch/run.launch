@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <launch>
+<!--============ Add new models in path ===========-->
+		<env name="GAZEBO_MODEL_PATH" value="$(find cart_opt_ctrl)/models:GAZEBO_MODEL_PATH"/>
+
 <!--============ ATI F/T Sensor Params ============-->
 
     <!-- The ATI Sensor default ip -->
