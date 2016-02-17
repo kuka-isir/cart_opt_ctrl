@@ -18,12 +18,11 @@ public:
                   const Eigen::Matrix<double,6,1>& jdot_qdot,
                   const Eigen::Matrix<double,Ndof,1>& coriolis,
                   const Eigen::Matrix<double,Ndof,1>& gravity,
-                  const Eigen::Matrix<double,Ndof,1>& add_torque,
                   const Eigen::Matrix<double,6,1>& xdd_des
                   )
     {
         this->updateBounds();
-        this->updateObjData(jacobian,mass,jdot_qdot,coriolis,gravity,add_torque,xdd_des);
+        this->updateObjData(jacobian,mass,jdot_qdot,coriolis,gravity,xdd_des);
         this->updateObj();
         this->updateDynamicsConstr(mass,this->b_qqd_);
         this->modelUpdate();        
@@ -54,13 +53,12 @@ protected:
                         const Eigen::Matrix<double,6,1>& jdot_qdot,
                         const Eigen::Matrix<double,Ndof,1>& coriolis,
                         const Eigen::Matrix<double,Ndof,1>& gravity,
-                        const Eigen::Matrix<double,Ndof,1>& add_torque,
                         const Eigen::Matrix<double,6,1>& xdd_des)
     {
         gravity_ = gravity;
         mass_inv_ = mass.inverse();
         a_ = jacobian * mass_inv_;
-        b_qqd_ = coriolis + gravity + add_torque;
+        b_qqd_ = coriolis + gravity ;
         cte_ = jdot_qdot.transpose() - (a_ * b_qqd_).transpose() - xdd_des.transpose();
         q_ = 2. * (cte_  * a_);
         Q_ = a_.transpose() * a_;

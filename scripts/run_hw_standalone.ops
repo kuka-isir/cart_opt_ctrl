@@ -9,4 +9,4 @@ state_pub.start()
 
 runScript(ros.find("cart_opt_ctrl")+"/scripts/run_hw.ops")
 CartOptCtrl.start()
-Solver.start()
+//Solver.start()
