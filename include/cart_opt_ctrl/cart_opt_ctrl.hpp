@@ -51,7 +51,7 @@
 #include <std_msgs/Float32MultiArray.h>
 #include <rtt/os/TimeService.hpp>
 #include <rtt/Time.hpp>
-  
+
 template <typename T>
 T clip(const T& n, const T& lower, const T& upper) {
   return std::max(lower, std::min(n, upper));
@@ -60,7 +60,7 @@ T clip(const T& n, const T& lower, const T& upper) {
 namespace lwr{
   static const int PINV_SOLVER  =0;
   static const int WDL_SOLVER   =1;
-  
+
   class CartOptCtrl : public RTTLWRAbstract{
     public:
       CartOptCtrl(const std::string& name);
@@ -81,7 +81,7 @@ namespace lwr{
       RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_min;
       RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_max;
       RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_des;
-        
+
       // Async update
       RTT::OutputPort<Eigen::VectorXd> port_add_torque;
       RTT::OutputPort<Eigen::VectorXd> port_q;
@@ -148,7 +148,7 @@ private:
       bool model_verbose_;
       double solver_duration;
       bool use_sim_clock;
-      bool init_pos_acquired;
+      bool init_pos_acquired,slow_down;
       std::string trajectory_frame;
       geometry_msgs::WrenchStamped wrench_msg;
       int n_updates_;
@@ -156,163 +156,6 @@ private:
   };
 }
 
-class RTTCartOptSolver: public RTT::TaskContext
-{
-public:
-      RTTCartOptSolver(const std::string& name): 
-      use_sim_clock(false),
-      n_updates_(0),
-      RTT::TaskContext(name)
-      {
-            this->addPort("q",port_q).doc("");
-            this->addPort("qdot",port_qdot).doc("");
-            this->addPort("jac",port_jacobian).doc("");
-            this->addPort("mass",port_mass).doc("");
-            this->addPort("dt",port_dt).doc("");
-            this->addPort("jdot_qdot",port_jdot_qdot).doc("");
-            this->addPort("coriolis",port_coriolis).doc("");
-            this->addPort("gravity",port_gravity).doc("");
-            this->addPort("xdd_des",port_xdd_des).doc("");
-            this->addPort("torque_out",port_torque_out).doc("");
-            this->ports()->addEventPort( "optimize", port_optimize_event ).doc( "" );
-            this->addProperty("use_sim_clock",use_sim_clock).doc("");
-            /*this->addOperation("setMethod",&RTTCartOptSolver::setMethod,this,RTT::OwnThread).doc( "" );
-            this->addOperation("setVerbose",&RTTCartOptSolver::setVerbose,this,RTT::OwnThread).doc( "" );
-            this->addOperation("setTimeLimit",&RTTCartOptSolver::setTimeLimit,this,RTT::OwnThread).doc( "" );
-            this->addOperation("setBarrierConvergeanceTolerance",&RTTCartOptSolver::setBarrierConvergeanceTolerance,this,RTT::OwnThread).doc( "" );*/
-      }
-    /*  void setMethod(int i)
-    {
-        cart_model_solver_.setMethod(i);
-    }
-
-    void setBarrierConvergeanceTolerance(double t)
-    {
-        cart_model_solver_.setBarrierConvergeanceTolerance(t);
-    }
-    void setTimeLimit(double t)
-    {
-        cart_model_solver_.setTimeLimit(t);
-    }
-
-    void setVerbose(bool v)
-    {
-        cart_model_solver_.setVerbose(v);
-    }*/
-      bool configureHook()
-      {
-            q.resize(LBR_MNJ);
-            qdot.resize(LBR_MNJ);
-            jacobian.resize(LBR_MNJ,LBR_MNJ);
-            mass.resize(LBR_MNJ,LBR_MNJ);
-            jdot_qdot.resize(6);
-            coriolis.resize(LBR_MNJ);
-            gravity.resize(LBR_MNJ);
-            xdd_des.resize(6);
-            torque_out.resize(LBR_MNJ);
-            add_torque.resize(LBR_MNJ);
-            
-            add_torque.setZero();
-            torque_out.setZero();
-            q.setZero();
-            qdot.setZero();
-            jacobian.setZero();
-            mass.setZero();
-            jdot_qdot.setZero();
-            coriolis.setZero();
-            gravity.setZero();
-            xdd_des.setZero();
-            
-            if(use_sim_clock){
-                RTT::Logger::Instance()->in(getName());
-                RTT::log(RTT::Warning) << "Using ROS Sim Clock" << RTT::endlog();
-                //rtt_rosclock::use_ros_clock_topic();
-                rtt_rosclock::enable_sim();
-                rtt_rosclock::set_sim_clock_activity(this);
-            }
-            port_optimize_time.createStream(rtt_roscomm::topic("~"+this->getName()+"/"+cart_model_solver_.getName()+"_duration"));
-            return true;
-      }
-
-      void updateHook()
-      {
-            RTT::log(RTT::Debug) << "Solver Update at "<<rtt_rosclock::host_now()<< RTT::endlog();
-            //RTT::os::TimeService::ticks timestamp = RTT::os::TimeService::Instance()->getTicks();
-            if(use_sim_clock)
-              gettimeofday(&tbegin,NULL);
-
-            RTT::FlowStatus fs = port_q.readNewest(q);
-            if(fs == RTT::NewData){
-                  port_qdot.readNewest(qdot);
-                  port_jacobian.readNewest(jacobian);
-                  port_mass.readNewest(mass);
-                  port_dt.readNewest(dt);
-                  port_jdot_qdot.readNewest(jdot_qdot);
-                  port_coriolis.readNewest(coriolis);
-                  port_gravity.readNewest(gravity);
-                  port_xdd_des.readNewest(xdd_des);
-
-                  cart_model_solver_.update(q,qdot,dt,
-                        jacobian,mass,jdot_qdot,
-                        coriolis,gravity,xdd_des );
-                  
-                  
-                  if(cart_model_solver_.optimize() && n_updates_ >= 0)
-                    cart_model_solver_.getTorque(torque_out,false);
-                  else
-                      torque_out.setZero();
-                  
-                  // TMP \\
-                  torque_out +=add_torque;
-                  port_torque_out.write(torque_out);
-            }
-            if(use_sim_clock){
-              gettimeofday(&tend,NULL);
-              elapsed_ros.data = 1000.*(tend.tv_sec-tbegin.tv_sec)+(tend.tv_usec-tbegin.tv_usec)/1000.;
-              //RTT::Seconds elapsed = RTT::os::TimeService::Instance()->secondsSince( timestamp );
-              //elapsed_ros.data = elapsed;
-              port_optimize_time.write(elapsed_ros);
-            }
-            //this->trigger();
-            //usleep(1*1E6);
-            n_updates_++;
-      }
-      RTT::InputPort<Eigen::VectorXd> port_q;
-      RTT::InputPort<Eigen::VectorXd> port_qdot;
-      RTT::InputPort<double> port_dt;
-      RTT::InputPort<Eigen::MatrixXd> port_jacobian;
-      RTT::InputPort<Eigen::MatrixXd> port_mass;
-      RTT::InputPort<Eigen::VectorXd> port_jdot_qdot;
-      RTT::InputPort<Eigen::VectorXd> port_coriolis;
-      RTT::InputPort<Eigen::VectorXd> port_gravity;
-      RTT::InputPort<Eigen::VectorXd> port_xdd_des;
-      RTT::OutputPort<Eigen::VectorXd> port_torque_out;
-      RTT::OutputPort<std_msgs::Float64> port_optimize_time;
-      RTT::InputPort<bool> port_optimize_event;
-
-      struct timeval tbegin,tend;
-      Eigen::VectorXd torque_out;
-      Eigen::VectorXd q;
-      Eigen::VectorXd qdot;
-      Eigen::VectorXd add_torque;
-      double dt;
-      Eigen::MatrixXd jacobian;
-      Eigen::MatrixXd mass;
-      Eigen::VectorXd jdot_qdot;
-      Eigen::VectorXd coriolis;
-      Eigen::VectorXd gravity;
-      Eigen::VectorXd xdd_des;
-      ros::Time start_t;
-      std_msgs::Float64 elapsed_ros;
-      bool use_sim_clock;
-      int n_updates_;
-
-protected:
-      lwr::LWRCartOptSolver<CartOptSolverqpOASES> cart_model_solver_;
-
-};
-
 ORO_LIST_COMPONENT_TYPE(lwr::CartOptCtrl)
-ORO_LIST_COMPONENT_TYPE(RTTCartOptSolver)
 ORO_CREATE_COMPONENT_LIBRARY()
 #endif
