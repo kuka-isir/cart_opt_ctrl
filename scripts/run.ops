@@ -1,0 +1,32 @@
+import("rtt_rospack")
+runScript(ros.find("lwr_launch")+"/scripts/lwr_loader.ops")
+
+loadRobot(true)
+loadStatePublisher(true)
+
+importRequiredPackages()
+
+setRobotInitialJointConfiguration(1.0,0.,0.0,-1.57,0.0,1.57,0.)
+
+ros.import("cart_opt_ctrl")
+require("print")
+
+loadComponent("CartOptCtrl","lwr::CartOptCtrl")
+
+CartOptCtrl.trajectory_frame="ati_link"
+CartOptCtrl.connect_all_ports_at_startup = false
+CartOptCtrl.use_sim_time = false
+
+setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
+
+connectPeers("CartOptCtrl",getRobotName())
+
+stream("CartOptCtrl.ati_ft_data_in", ros.comm.topic("ft_sensor/wrench"))
+
+CartOptCtrl.configure()
+
+connectAllPorts("CartOptCtrl",getRobotName(),ConnPolicy())
+
+CartOptCtrl.computeTrajectory(0.01,0.05,0.05,0.2)
+
+CartOptCtrl.start()
