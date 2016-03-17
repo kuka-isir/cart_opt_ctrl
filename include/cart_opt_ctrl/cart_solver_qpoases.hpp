@@ -96,10 +96,10 @@ public:
         if(do_init)
         {
             //nWSR = 1E6;
-            ret_ = cart_prob.init( H,g,A,lb,ub,eqA,eqA, nWSR,&cpulimit);
+            ret_ = cart_prob.init( H,g,A,lb,ub,eqA,eqA, nWSR,NULL);
             do_init = false;
         }else
-            ret_ = cart_prob.hotstart( H,g,A,lb,ub,eqA,eqA, nWSR,&cpulimit);
+            ret_ = cart_prob.hotstart( H,g,A,lb,ub,eqA,eqA, nWSR,NULL);
         cart_prob.getPrimalSolution(x_out);
         return ret_ == qpOASES::SUCCESSFUL_RETURN;
     }

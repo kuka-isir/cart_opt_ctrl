@@ -152,6 +152,7 @@ private:
       std::string trajectory_frame;
       geometry_msgs::WrenchStamped wrench_msg;
       int n_updates_;
+      lwr::LWRCartOptSolver<CartOptSolverqpOASES> cart_model_solver_;
   };
 }
 
@@ -173,7 +174,6 @@ public:
             this->addPort("gravity",port_gravity).doc("");
             this->addPort("xdd_des",port_xdd_des).doc("");
             this->addPort("torque_out",port_torque_out).doc("");
-            this->addPort("add_torque",port_add_torque).doc("");
             this->ports()->addEventPort( "optimize", port_optimize_event ).doc( "" );
             this->addProperty("use_sim_clock",use_sim_clock).doc("");
             /*this->addOperation("setMethod",&RTTCartOptSolver::setMethod,this,RTT::OwnThread).doc( "" );
@@ -251,12 +251,10 @@ public:
                   port_coriolis.readNewest(coriolis);
                   port_gravity.readNewest(gravity);
                   port_xdd_des.readNewest(xdd_des);
-                  add_torque.setZero();
-                  port_add_torque.readNewest(add_torque);
 
                   cart_model_solver_.update(q,qdot,dt,
                         jacobian,mass,jdot_qdot,
-                        coriolis,gravity,add_torque,xdd_des );
+                        coriolis,gravity,xdd_des );
                   
                   
                   if(cart_model_solver_.optimize() && n_updates_ >= 0)
@@ -279,7 +277,6 @@ public:
             //usleep(1*1E6);
             n_updates_++;
       }
-      RTT::InputPort<Eigen::VectorXd> port_add_torque;
       RTT::InputPort<Eigen::VectorXd> port_q;
       RTT::InputPort<Eigen::VectorXd> port_qdot;
       RTT::InputPort<double> port_dt;

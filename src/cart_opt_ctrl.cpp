@@ -87,7 +87,7 @@ bool CartOptCtrl::configureHook()
         log(RTT::Fatal) << "Configure parent error" << endlog();
         return false;
     }
-    port_JointTorqueCommand.disconnect();
+    /////port_JointTorqueCommand.disconnect();
     log(Warning) << "Configured" << endlog();
     this->getAllComponentRelative();
 
@@ -375,16 +375,16 @@ void CartOptCtrl::updateHook()
 //	clock_gettime(CLOCK_HOST_REALTIME,&ts);
 //	ros::Time start_opt = ros::Time(ts.tv_sec, ts.tv_nsec);
 #endif
-            port_q.write(jnt_pos);
-            port_qdot.write(jnt_vel);
-            port_jacobian.write(J_ati_base.data);
-            port_mass.write(mass_kdl.data);
-            port_dt.write(kdt_*static_cast<double>(getPeriod()));
-            port_jdot_qdot.write(jdot_qdot_);
-            port_coriolis.write(coriolis_kdl.data);
-            port_gravity.write(gravity_kdl.data);
-            port_xdd_des.write(xdd_des_);
-
+// // // // // // //             port_q.write(jnt_pos);
+// // // // // // //             port_qdot.write(jnt_vel);
+// // // // // // //             port_jacobian.write(J_ati_base.data);
+// // // // // // //             port_mass.write(mass_kdl.data);
+// // // // // // //             port_dt.write(kdt_*static_cast<double>(getPeriod()));
+// // // // // // //             port_jdot_qdot.write(jdot_qdot_);
+// // // // // // //             port_coriolis.write(coriolis_kdl.data);
+// // // // // // //             port_gravity.write(gravity_kdl.data);
+// // // // // // //             port_xdd_des.write(xdd_des_);
+// // // // // // //             port_optimize_event.write(true);
     /*update_(jnt_pos,
                                     jnt_vel,
                                     3.*static_cast<double>(getPeriod()),
@@ -395,8 +395,7 @@ void CartOptCtrl::updateHook()
                                     gravity_kdl.data,
                                     xdd_des_);*/
 
-            /*int rc = pthread_create(&th_, NULL , &lwr::CartOptCtrl::optimize,&cart_model_solver_);
-            pthread_join(th_,NULL);*/
+
         /*cart_model_solver_.optimize(jnt_pos,
                                     jnt_vel,
                                     
@@ -411,8 +410,22 @@ void CartOptCtrl::updateHook()
 
         cart_model_solver_.getQddBounds(qdd_min_ros.data,qdd_max_ros.data,qdd_des_ros.data);*/
         
-        
-        
+        cart_model_solver_.update(jnt_pos,
+                                    jnt_vel,
+                                    kdt_*static_cast<double>(getPeriod()),
+                                    J_ati_base.data,
+                                    mass_kdl.data,
+                                    jdot_qdot_,
+                                    coriolis_kdl.data,
+                                    gravity_kdl.data,
+                                    xdd_des_);
+                  
+                  
+	if(cart_model_solver_.optimize())
+	  cart_model_solver_.getTorque(jnt_trq_cmd,false);
+	else
+	    jnt_trq_cmd.setZero();
+                          
         
         if(use_ft_sensor_ && port_ftdata.read(wrench_msg) != RTT::NoData){
             // remove B(q,qdot)
@@ -426,11 +439,10 @@ void CartOptCtrl::updateHook()
             // Get Joint Gravity torque
             //id_dyn_solver->JntToGravity(jnt_pos_kdl,gravity_kdl);
             // remove G(q)
-            jnt_trq_cmd = jnt_trq_kdl.data - gravity_kdl.data;
+            jnt_trq_cmd += jnt_trq_kdl.data - gravity_kdl.data;
             //RTT::log(RTT::Debug) << "CartOptCtrl add_torque "<<jnt_trq_cmd << "due to wrench "<<wrench_kdl<< RTT::endlog();
-            port_add_torque.write(jnt_trq_cmd);
+            //port_add_torque.write(jnt_trq_cmd);
         }
-        port_optimize_event.write(true); // let's go !
     
     
 #ifndef __XENOMAI__
@@ -456,32 +468,10 @@ void CartOptCtrl::updateHook()
     port_qdd_min.write(qdd_min_ros);
     port_qdd_max.write(qdd_max_ros);
         
-    /*} catch(GRBException e) {
-        log(RTT::Error) << "Error code = " << e.getErrorCode() << endlog();
-        log(RTT::Error) << e.getMessage() << endlog();
-        log(RTT::Error) << "jnt_pos_kdl"<<jnt_pos_kdl
-                        << "jnt_vel_kdl"<<jnt_vel_kdl
-                        << "\nJ_ati_base.data\n"<<J_ati_base.data
-                        << "\nmass_kdl.data\n" <<mass_kdl.data
-                        << "\njdot_qdot_\n" <<jdot_qdot_.transpose()
-                        << "\ncoriolis_kdl.data\n" <<coriolis_kdl.data.transpose()
-                        << "\ngravity_kdl.data\n" << gravity_kdl.data.transpose()
-                        << "\nxdd_des_\n"<< xdd_des_.transpose()
-                        << "\njnt_trq_cmd\n"<<jnt_trq_cmd.transpose()
-                        <<endlog();
-    } catch(...) {
-        log(RTT::Error) << "Exception during optimization" << endlog();
-    } */   
-    //log(Info) << "trqcmd " << jnt_trq_cmd.transpose() << endlog();
-    
-    /*if(!debug_mode_)
-        if(!isCommandMode())
-            return;*/
-        
-    //sendJointTorque(jnt_trq_cmd);
+    sendJointTorque(jnt_trq_cmd);
     
     // Incremente traj
-    if(isReadyToStart() && traj_computed){
+    if(isReadyToStart() && traj_computed && isCommandMode()){
         if( t_traj_curr <= ctraject->Duration())
             t_traj_curr += static_cast<double>(this->getPeriod());
         else
