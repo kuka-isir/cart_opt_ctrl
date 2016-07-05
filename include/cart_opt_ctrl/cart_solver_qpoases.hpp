@@ -58,8 +58,8 @@ public:
         }     
     }
     void updateObj(){
-        g_.head(Ndof) = this->q_;
-        H_.block(0,0,Ndof,Ndof) = this->Q_;
+        g_.head(Ndof) = 0.5*this->q_;
+        H_.block(0,0,Ndof,Ndof) = /*2.0**/this->Q_;
         
         Eigen::Map<Eigen::Matrix<double,NVars,1> >(g, NVars, 1) = g_;
         Eigen::Map<Eigen::Matrix<double,NVars,NVars,Eigen::RowMajor> >(H, NVars, NVars) = H_;
