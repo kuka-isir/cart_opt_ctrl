@@ -6,6 +6,8 @@ loadStatePublisher(true)
 
 setRobotInitialJointConfiguration(1.0,0.,0.0,-1.57,0.0,1.57,0.)
 
+setJointTorqueControlMode()
+
 ros.import("cart_opt_ctrl")
 require("print")
 

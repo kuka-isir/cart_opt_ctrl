@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <launch>
 <!--============ Add new models in path ===========-->
-		<env name="GAZEBO_MODEL_PATH" value="$(find cart_opt_ctrl)/models:GAZEBO_MODEL_PATH"/>
+	<env name="GAZEBO_MODEL_PATH" value="$(find cart_opt_ctrl)/models:GAZEBO_MODEL_PATH"/>
 
 <!--============ ATI F/T Sensor Params ============-->
 
@@ -43,7 +43,7 @@
 <!--============ CartOptCtrl Params ============-->
 
     <!-- The parameters that the CartOptCtrl sensor will get -->
-    <rosparam unless="$(arg sim)" ns="CartOptCtrl" subst_value="true">
+    <rosparam ns="CartOptCtrl" subst_value="true">
         kp_lin: 600.0
         kd_lin: 10.0
         kp_ang: 250.0
@@ -57,7 +57,7 @@
         use_xd_des: true
         use_coriolis: true
         use_xdd_des: true
-        use_ft_sensor: true
+        use_ft_sensor: false
         use_damping: false
         use_nso: false
         kp_ref: 100.0
