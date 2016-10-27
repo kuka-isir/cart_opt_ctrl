@@ -9,23 +9,19 @@ setRobotInitialJointConfiguration(1.0,0.,0.0,-1.57,0.0,1.57,0.)
 setJointTorqueControlMode()
 
 ros.import("cart_opt_ctrl")
-require("print")
 
-loadComponent("CartOptCtrl","lwr::CartOptCtrl")
+loadComponent("CartOptCtrl","CartOptCtrl")
 
-CartOptCtrl.trajectory_frame="ati_link"
-CartOptCtrl.use_sim_time = false
 
 setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
 
 connectPeers("CartOptCtrl",getRobotName())
 
-stream("CartOptCtrl.ati_ft_data_in", ros.comm.topic("ft_sensor/wrench"))
+
+// Connect JointPosition,Velocity,Torque and the correspoing *Command ports
 
 connectStandardPorts("CartOptCtrl",getRobotName(),ConnPolicy())
 
-CartOptCtrl.configure()
+configureComponent("CartOptCtrl")
 
-CartOptCtrl.computeTrajectory(0.01,0.05,0.05,0.2)
-
-CartOptCtrl.start()
+startComponent("CartOptCtrl")

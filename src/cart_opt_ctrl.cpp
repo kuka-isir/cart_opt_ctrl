@@ -1,402 +1,224 @@
 #include "cart_opt_ctrl/cart_opt_ctrl.hpp"
+#include "eigen_conversions/eigen_kdl.h"
 
 
-namespace lwr{
 using namespace RTT;
 using namespace KDL;
 
-CartOptCtrl::CartOptCtrl(const std::string& name):
-t_traj_curr(0),
-kp_lin(1000.0),
-kp_ang(650.0),
-kd_lin(50.0),
-kd_ang(20.0),
-ready_to_start_(false),
-traj_computed(false),
-debug_mode_(false),
-use_jdot_qdot_(true),
-use_f_ext_(true),
-use_coriolis_(true),
-d_ang_max_(100.0),
-dw_max_(0.5),
-use_xdd_des_(true),
-elapsed(0),
-use_xd_des_(true),
-use_ft_sensor_(true),
-model_verbose_(false),
-jacobian_solver_type_(WDL_SOLVER),
-kdt_(5.0),
-init_pos_acquired(false),
-use_sim_clock(false),
-trajectory_frame("link_7"),
-spacenav_scale_trans(0.0001),
-spacenav_scale_rot(0.0001),
-n_updates_(0),
-RTTLWRAbstract(name)
+CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
 {
-    this->ports()->addPort("ati_ft_data_in",port_ftdata).doc("The ATI F/T Sensor Input");
-    this->addOperation("publishTrajectory",&CartOptCtrl::publishTrajectory,this,RTT::OwnThread);
-    this->addOperation("computeTrajectory",&CartOptCtrl::computeTrajectory,this,RTT::OwnThread);
-    this->addProperty("kp_lin",kp_lin);
-    this->addProperty("kp_ang",kp_ang);
-    this->addProperty("kd_lin",kd_lin);
-    this->addProperty("kd_ang",kd_ang);
-    this->addProperty("dw_max",dw_max_);
-    this->addProperty("dx_ang",d_ang_max_);
-    this->addProperty("spacenav_scale_trans",spacenav_scale_trans);
-    this->addProperty("spacenav_scale_rot",spacenav_scale_rot);
-    this->addProperty("trajectory_frame",trajectory_frame);
-    this->addProperty("kdt",kdt_);
-    this->addProperty("debug_mode",debug_mode_);
-    this->addProperty("use_jdot_qdot",use_jdot_qdot_);
-    this->addProperty("use_f_ext",use_f_ext_);
-    this->addProperty("use_coriolis",use_coriolis_);
-    this->addProperty("use_xd_des",use_xd_des_);
-    this->addProperty("use_xdd_des",use_xdd_des_);
-    this->addProperty("ReadyToStart",ready_to_start_);
-    this->addProperty("jacobian_solver_type",jacobian_solver_type_);
-    this->provides("debug")->addAttribute("solver_duration",solver_duration);
-    this->provides("debug")->addAttribute("UpdateHookDuration",elapsed);
-    this->provides("debug")->addAttribute("WrenchInBase",F_ext);
-    this->addProperty("use_ft_sensor",use_ft_sensor_);
+    this->addPort("JointPosition",this->port_joint_position_in);
+    this->addPort("JointVelocity",this->port_joint_velocity_in);
+    this->addPort("JointTorqueCommand",this->port_joint_torque_out);
+    this->addPort("TrajectoryPointIn",this->port_traj_in);
+    
+    this->addProperty("P_gain",this->P_gain).doc("Proportional gain");
+    this->addProperty("D_gain",this->D_gain).doc("Derivative gain");
 }
 
 bool CartOptCtrl::configureHook()
 {
-    if(false == RTTLWRAbstract::init())
+    // Initialise the model, the internal solvers etc
+    if( ! this->arm.init() )
     {
-        log(RTT::Fatal) << "Configure parent error" << endlog();
+        log(RTT::Error) << "Could not init chain utils !" << endlog();
         return false;
     }
-
-    this->getAllComponentRelative();
-
-    log(Info) << "Configuring ChainJntToJacDotSolver " << endlog();
-    jdot_solver.reset(new KDL::ChainJntToJacDotSolver(kdl_chain));
-
-    log(Info) << "createStream" << endlog();
-    Xd_cmd.setZero();
-    X_err.setZero();
-    Xd_err.setZero();
-
-    port_spacenav.createStream(rtt_roscomm::topic("spacenav/twist"));
-
-    port_X_curr.createStream(rtt_roscomm::topic("~"+getName()+"/pos_curr"));
-    port_X_tmp.createStream(rtt_roscomm::topic("~"+getName()+"/pos_tmp"));
-    port_X_des.createStream(rtt_roscomm::topic("~"+getName()+"/pos_des"));
-    port_pose_array.createStream(rtt_roscomm::topic("~"+getName()+"/traj_poses"));
-    port_path_ros.createStream(rtt_roscomm::topic("~"+getName()+"/cart_traj_des"));
-    port_solver_duration.createStream(rtt_roscomm::topic("~"+getName()+"/solver_duration"));
-    port_qdd_max.createStream(rtt_roscomm::topic("~"+getName()+"/qdd_max"));
-    port_qdd_min.createStream(rtt_roscomm::topic("~"+getName()+"/qdd_min"));
-    port_qdd_des.createStream(rtt_roscomm::topic("~"+getName()+"/qdd_des"));
-
-    port_loop_duration.createStream(rtt_roscomm::topic("~"+getName()+"/loop_duration"));
-
-    qdd_min_ros.data.resize(kdl_chain.getNrOfJoints());
-    qdd_max_ros.data.resize(kdl_chain.getNrOfJoints());
-    qdd_des_ros.data.resize(kdl_chain.getNrOfJoints());
-
-
-    qdd_des.resize(kdl_chain.getNrOfJoints());
-    mass_kdl.resize(kdl_chain.getNrOfJoints());
-    qdd_des_kdl.resize(kdl_chain.getNrOfJoints());
-    coriolis.resize(kdl_chain.getNrOfJoints());
-    jnt_pos_eigen.resize(kdl_chain.getNrOfJoints());
-    jdot.resize(kdl_chain.getNrOfSegments());
-    J_ati_base.resize(kdl_chain.getNrOfJoints());
-    J_ee_base.resize(kdl_chain.getNrOfJoints());
-    jnt_acc_kdl.resize(kdl_chain.getNrOfJoints());
-    // Get initial pose
-
-    mass_inv.resize(kdl_chain.getNrOfJoints(),kdl_chain.getNrOfJoints());
-
-    port_qdot.setDataSample(jnt_pos);
-    port_jacobian.setDataSample(J_ati_base.data);
-    port_mass.setDataSample(mass_kdl.data);
-    port_jdot_qdot.setDataSample(jdot_qdot_);
-    port_coriolis.setDataSample(coriolis);
-    port_gravity.setDataSample(jnt_grav);
-    port_xdd_des.setDataSample(xdd_des_);
-
-    log(RTT::Info) << " Let's go" << endlog();
-#ifdef __XENOMAI__
-    log(RTT::Info) << "** USING XENOMAI **" << endlog();
-#endif
-    return true;
-}
-bool CartOptCtrl::computeTrajectory(const double radius, const double eqradius,const double vmax, const double accmax)
-{
-    if(!updateState())
-        return false;
-    log(Info) << "Computing Trajectory" << endlog();
-    try
-    {
-
-        fk_vel_solver->JntToCart(jnt_pos_vel_kdl,frame_vel_des_kdl,this->seg_names_idx[trajectory_frame]);
-        frame_des_kdl =  frame_vel_des_kdl.GetFrame();
-
-        path = new Path_RoundedComposite(radius,eqradius,new RotationalInterpolation_SingleAxis());
-        path->Add(frame_des_kdl);
-        path->Add(Frame(Rotation::RPY(99.*deg2rad,        -17.*deg2rad,     -101.*deg2rad),   Vector(-.467,-.448,.576)));
-        path->Add(Frame(Rotation::RPY(99.*deg2rad,        -17.*deg2rad,     -101.*deg2rad),   Vector(-.467,-.448,.376)));
-        /*path->Add(Frame(Rotation::RPY(88.*deg2rad,        -4.*deg2rad,     -36.*deg2rad),   Vector(-.372,-.527,.505)));
-        path->Add(Frame(Rotation::RPY(91.0*deg2rad,         -3.*deg2rad,   -28.*deg2rad), Vector(-.198,-.657,.695)));
-        path->Add(Frame(Rotation::RPY(89.0*deg2rad,       -17.*deg2rad,   -32.*deg2rad), Vector(-.219,-.725,.404)));*/
-        path->Add(frame_des_kdl);
-        // always call Finish() at the end, otherwise the last segment will not be added.
-        path->Finish();
-
-        velpref = new VelocityProfile_Trap(vmax,accmax);
-        velpref->SetProfile(0,path->PathLength());
-        traject = new Trajectory_Segment(path, velpref);
-
-        ctraject = new Trajectory_Composite();
-        ctraject->Add(traject);
-        ctraject->Add(new Trajectory_Stationary(1.0,frame_des_kdl));
-        traj_computed = true;
-
-    } catch(KDL::Error& error) {
-            std::cout <<"I encountered this error : " << error.Description() << endlog();
-            std::cout << "with the following type " << error.GetType() << endlog();
-            return false;
-    }
-
+    // The number of joints
+    const int dof  = this->arm.getNrOfJoints();
+    
+    // Not using Matrix<double,6,1> becquse of ops script limitations
+    this->P_gain.resize(6);
+    this->D_gain.resize(6);
+    
+    // Default gains, works but stiff
+    this->P_gain << 1000,1000,1000,300,300,300;
+    this->D_gain << 50,50,50,10,10,10;
+    
+    // Match all properties (defined in the constructor) 
+    // with the rosparams in the namespace : 
+    // nameOfThisComponent/nameOftheProperty
+    // Equivalent to ros::param::get("CartOptCtrl/P_gain");
+    rtt_ros_kdl_tools::getAllPropertiesFromROSParam(this);
+    
+    // Let's use the last segment
+    this->ee_frame = arm.getSegmentName( arm.getNrOfSegments() - 1 );
+    
+    // For now we have 0 constraints for now
+    int number_of_constraints = 0;
+    this->qpoases_solver.reset(new qpOASES::SQProblem(dof,number_of_constraints));
+    
+    // Resize and set torque at zero
+    this->joint_torque_out.setZero(dof);
+    this->joint_position_in.setZero(dof);
+    this->joint_velocity_in.setZero(dof);
+    
+    
+    // QPOases options
+    qpOASES::Options options;
+    // This options enables regularisation (required) and disable
+    // some checks to be very fast !
+    options.setToMPC();
+    this->qpoases_solver->setOptions(options);
+    // Remove verbosity
+    this->qpoases_solver->setPrintLevel(qpOASES::PL_NONE/*qpOASES::PL_DEBUG*/);
+    
     return true;
 }
 
-void CartOptCtrl::publishTrajectory()
+bool CartOptCtrl::startHook()
 {
-    if(!traj_computed)
-        return;
-    double dt=static_cast<double>(this->getPeriod());
-    nav_msgs::Path path_ros;
-    path_ros.header.frame_id = root_link;
-    log(Debug) << "Creating Path" << endlog();
-    geometry_msgs::PoseArray pose_array;
-    for (double t=0.0; t <= ctraject->Duration(); t+= 0.1) {
-            Frame current_pose;
-            Twist current_vel,current_acc;
-
-            current_pose = ctraject->Pos(t);
-            current_vel = ctraject->Vel(t);
-            current_acc = ctraject->Acc(t);
-
-            geometry_msgs::Pose pose;
-            geometry_msgs::PoseStamped pose_st;
-            tf::poseKDLToMsg(current_pose,pose);
-            pose_array.poses.push_back(pose);
-            pose_st.header.frame_id = path_ros.header.frame_id;
-            pose_st.pose = pose;
-            path_ros.poses.push_back(pose_st);
-
-    }
-
-    pose_array.header.frame_id = path_ros.header.frame_id;
-    pose_array.header.stamp = rtt_rosclock::host_now();
-
-    port_pose_array.write(pose_array);
-    log(Debug) << "Sending Path" << endlog();
-    port_path_ros.write(path_ros);
-    log(Debug) << "Publishing done" << endlog();
+    this->has_first_command = false;
 }
+
+
 
 void CartOptCtrl::updateHook()
-{
-    static bool first_loop;
-    RTT::log(RTT::Debug) << "CartOptCtrl Update at "<<rtt_rosclock::host_now()<< RTT::endlog();
-    if(!updateState() /*|| !isCommandMode()*/)
+{  
+   
+    // Read the current state of the robot
+    RTT::FlowStatus fp = this->port_joint_position_in.read(this->joint_position_in);
+    RTT::FlowStatus fv = this->port_joint_velocity_in.read(this->joint_velocity_in);
+    
+    // Return if not giving anything (might happend during startup)
+    if(fp == RTT::NoData || fv == RTT::NoData)
+    {
         return;
-
-#ifdef __XENOMAI__
-	RTIME t_optimize,t_loop;
-	std_msgs::Float64 loop_duration;
-	RTIME t_loop_start = rt_timer_read();
-	RTT::os::TimeService::ticks tt_start = RTT::os::TimeService::Instance()->getTicks();
-#endif
-
-    static Frame X_des,X_mes;
-    static Twist Xdd_des,Xd_mes,Xd_des;
-
-    // Fk -> X last frame
-    jnt_to_jac_solver->JntToJac(jnt_pos_kdl,J_ati_base,this->seg_names_idx[trajectory_frame]);
-    jdot_solver->JntToJacDot(jnt_pos_vel_kdl,jdot_qdot,this->seg_names_idx[trajectory_frame]);
-    fk_vel_solver->JntToCart(jnt_pos_vel_kdl,tool_in_base_framevel,this->seg_names_idx[trajectory_frame]);
-    X_mes =  tool_in_base_framevel.GetFrame();
-    Xd_mes = tool_in_base_framevel.GetTwist();
-
-    if(n_updates_ == 0)
-    {
-        X_des = X_mes;
     }
+    
+    // Feed the internal model
+    arm.setState(this->joint_position_in,this->joint_velocity_in);
+    // Make some calculations
+    arm.updateModel();
+    
+    // Get Current end effector Pose
+    X_curr = arm.getSegmentPosition(this->ee_frame);
 
-
-    geometry_msgs::Twist spacenav_tw;
-    if(port_spacenav.read(spacenav_tw) != RTT::NoData)
+    KDL::SetToZero(Xd_traj);
+    KDL::SetToZero(Xdd_traj);  
+    
+    if(this->port_traj_in.read(this->traj_pt_in) != RTT::NoData)
     {
-        // Bypassing everybody :)
-        X_des.M = X_des.M * KDL::Rotation::RPY(spacenav_scale_rot * spacenav_tw.angular.x,
-                                              spacenav_scale_rot * spacenav_tw.angular.y,
-                                              spacenav_scale_rot * spacenav_tw.angular.z);
-        X_des.p = X_des.p + KDL::Vector(spacenav_scale_trans * spacenav_tw.linear.x,
-                                                  spacenav_scale_trans * spacenav_tw.linear.y,
-                                                  spacenav_scale_trans * spacenav_tw.linear.z);
-    }else{
-        if(traj_computed)
-            X_des = ctraject->Pos(t_traj_curr);
-        else{
-            if(!init_pos_acquired)
-            {
-                fk_vel_solver->JntToCart(jnt_pos_vel_kdl,frame_vel_des_kdl,this->seg_names_idx[trajectory_frame]);
-                X_des =  frame_vel_des_kdl.GetFrame();
-                init_pos_acquired = true;
-            }
+        
+        X_traj = this->traj_pt_in.GetFrame();
+        Xd_traj = this->traj_pt_in.GetTwist();
+        Xdd_traj = this->traj_pt_in.GetAccTwist();
+        
+        has_first_command = true;
+    }
+    
+    
+    // First step, initialise the first X,Xd,Xdd desired
+    if(!has_first_command)
+    {
+        
+        X_traj = X_curr;
+        
+        has_first_command = true;
+    }
+    
+    X_err = diff( X_curr , X_traj );
+    Xd_err = diff( Xd_curr , Xd_traj);
+    
+
+    KDL::Twist kp_,kd_;
+    
+    tf::twistEigenToKDL(this->P_gain,kp_);
+    tf::twistEigenToKDL(this->D_gain,kd_);
+    
+    Xdd_des.vel = Xdd_traj.vel + kp_.vel * ( X_err.vel ) + kd_.vel * ( Xd_err.vel );
+    Xdd_des.rot = Xdd_traj.rot + kp_.rot * ( X_err.rot ) + kd_.rot * ( Xd_err.rot );
+    
+    Eigen::Matrix<double,6,1> xdd_des;
+    tf::twistKDLToEigen(Xdd_des,xdd_des);
+    
+    KDL::Jacobian& J = arm.getSegmentJacobian(this->ee_frame);
+    
+    KDL::JntSpaceInertiaMatrix& M_inv = arm.getInertiaInverseMatrix();
+    
+    KDL::JntArray& coriolis = arm.getCoriolisTorque();
+    
+    KDL::JntArray& gravity = arm.getGravityTorque();
+    
+    KDL::Twist& Jdotqdot = arm.getSegmentJdotQdot(this->ee_frame);
+    
+    Eigen::Matrix<double,6,1> jdot_qdot;
+    tf::twistKDLToEigen(Jdotqdot,jdot_qdot);
+    
+    // We put it in the form ax + b
+    Eigen::MatrixXd a;
+    a.resize(6,arm.getNrOfJoints());
+    
+    Eigen::Matrix<double,6,1> b;
+    
+    a = - J.data * M_inv.data;
+    b = - a * ( coriolis.data + gravity.data ) + xdd_des - jdot_qdot;
+    
+    // Matrices for qpOASES
+    Eigen::MatrixXd H;
+    H.resize(arm.getNrOfJoints(),arm.getNrOfJoints());
+    
+    Eigen::VectorXd g;
+    g.resize(arm.getNrOfJoints());
+    
+    H = 2 * a.transpose() * a;
+    g = 2 * a.transpose() * b;
+    
+    // TODO: get this from URDF
+    Eigen::VectorXd torque_max;
+    torque_max.resize(arm.getNrOfJoints());
+    torque_max.setConstant(100); // N.m
+
+    Eigen::VectorXd torque_min;
+    torque_min.resize(arm.getNrOfJoints());
+    torque_min = -torque_max; // N.m
+    
+    // Compute bounds
+    Eigen::VectorXd lb,ub;
+    lb.resize(arm.getNrOfJoints());
+    ub.resize(arm.getNrOfJoints());
+    
+    //TODO : write constraints for q and qdot
+    lb = torque_min;
+    ub = torque_max;
+    
+    // number of allowed compute steps
+    int nWSR = 1000; 
+    
+    // Let's compute !
+    qpOASES::returnValue ret;
+    static bool qpoases_initialized = false;
+    
+    if(!qpoases_initialized)
+    {
+        // Initialise the problem, once it has found a solution, we can hotstart
+        ret = qpoases_solver->init(H.data(),g.data(),NULL,lb.data(),ub.data(),NULL,NULL,nWSR);
+        if(ret == qpOASES::SUCCESSFUL_RETURN)
+        {
+            qpoases_initialized = true;
         }
     }
-
-
-
-    Frame X_curr = X_mes;
-
-    Twist d_err = diff(X_curr,X_des);
-
-    Frame X_tmp(X_curr);
-    X_tmp.M = Rotation::Rot(d_err.rot,d_err.rot.Norm()) * X_tmp.M;
-
-    if(1)
-    {
-        // Ros pub
-       X_curr_msg.header.frame_id =
-            X_tmp_msg.header.frame_id =
-            X_des_msg.header.frame_id = root_link;
-
-       X_curr_msg.header.stamp =
-            X_tmp_msg.header.stamp =
-            X_des_msg.header.stamp = rtt_rosclock::host_now();
-
-       tf::poseKDLToMsg(X_curr,X_curr_msg.pose);
-       tf::poseKDLToMsg(X_tmp,X_tmp_msg.pose);
-       tf::poseKDLToMsg(X_des,X_des_msg.pose);
-
-       port_X_curr.write(X_curr_msg);
-       port_X_tmp.write(X_tmp_msg);
-       port_X_des.write(X_des_msg);
-    }
-
-    if(use_xd_des_ && traj_computed)
-        Xd_des = ctraject->Vel(t_traj_curr);
     else
-        SetToZero(Xd_des);
-    Twist dd_err = diff(Xd_mes,Xd_des);
-
-
-
-    Xdd_des.vel = kp_lin*d_err.vel + kd_lin*dd_err.vel;
-
-    Vector dr = kp_ang*d_err.rot;
-    dr(0) = clip(dr(0),-d_ang_max_,d_ang_max_);
-    dr(1) = clip(dr(1),-d_ang_max_,d_ang_max_);
-    dr(2) = clip(dr(2),-d_ang_max_,d_ang_max_);
-
-    Xdd_des.rot = dr + kd_ang*(dd_err.rot);
-
-    if(use_xdd_des_ && traj_computed)
-            Xdd_des += ctraject->Acc(t_traj_curr);
-
-    id_dyn_solver->JntToCoriolis(jnt_pos_kdl,jnt_vel_kdl,coriolis_kdl);
-    id_dyn_solver->JntToGravity(jnt_pos_kdl,gravity_kdl);
-    id_dyn_solver->JntToMass(jnt_pos_kdl,mass_kdl);
-
-    tf::twistKDLToEigen(Xdd_des,xdd_des_);
-    tf::twistKDLToEigen(jdot_qdot,jdot_qdot_);
-
-    //try{
-#ifndef __XENOMAI__
-        struct timeval tbegin,tend;
-        gettimeofday(&tbegin,NULL);
-#else
-	RTIME t_start = rt_timer_read();
-#endif
-        cart_model_solver_.update(jnt_pos,
-                                    jnt_vel,
-                                    kdt_*static_cast<double>(getPeriod()),
-                                    J_ati_base.data,
-                                    mass_kdl.data,
-                                    jdot_qdot_,
-                                    coriolis_kdl.data,
-                                    gravity_kdl.data,
-                                    xdd_des_);
-
-
-	if(cart_model_solver_.optimize())
-	  cart_model_solver_.getTorque(jnt_trq_cmd,false);
-	else
-	    jnt_trq_cmd.setZero();
-
-
-        if(use_ft_sensor_ && port_ftdata.read(wrench_msg) != RTT::NoData){
-            // remove B(q,qdot)
-            jnt_vel_kdl.data.setZero();
-            jnt_acc_kdl.data.setZero();
-            // Get the Wrench in the last segment's frame
-            tf::wrenchMsgToKDL(wrench_msg.wrench,wrench_kdl);
-            f_ext_kdl.back() = wrench_kdl;
-            // Get The full dynamics with external forces
-            id_rne_solver->CartToJnt(jnt_pos_kdl,jnt_vel_kdl,jnt_acc_kdl,f_ext_kdl,jnt_trq_kdl);
-            // Get Joint Gravity torque
-            //id_dyn_solver->JntToGravity(jnt_pos_kdl,gravity_kdl);
-            // remove G(q)
-            jnt_trq_cmd += jnt_trq_kdl.data - gravity_kdl.data;
-            //RTT::log(RTT::Debug) << "CartOptCtrl add_torque "<<jnt_trq_cmd << "due to wrench "<<wrench_kdl<< RTT::endlog();
-            //port_add_torque.write(jnt_trq_cmd);
-        }
-
-
-#ifndef __XENOMAI__
-        gettimeofday(&tend,NULL);
-#else
-	RTIME t_stop = rt_timer_read();
-//	clock_gettime(CLOCK_HOST_REALTIME,&ts);
-//        ros::Time stop_opt = ros::Time(ts.tv_sec, ts.tv_nsec);
-#endif
-        // Don't forget to remove G(q) as Kuka adds it on KRC
-        //jnt_trq_cmd-=gravity_kdl.data;
-
-        std_msgs::Float64 d;
-#ifndef __XENOMAI__
-        d.data =  1000*(tend.tv_sec-tbegin.tv_sec)+(tend.tv_usec-tbegin.tv_usec)/1000.;
-#else
-	t_optimize = rt_timer_ticks2ns(t_stop-t_start);
-	d.data = t_optimize;
-//        d.data = (stop_opt - start_opt).toSec();
-#endif
-    port_solver_duration.write(d);
-    port_qdd_des.write(qdd_des_ros);
-    port_qdd_min.write(qdd_min_ros);
-    port_qdd_max.write(qdd_max_ros);
-
-    sendJointTorque(jnt_trq_cmd);
-
-    // Incremente traj
-    if(isReadyToStart() && traj_computed && isCommandMode()){
-        if( t_traj_curr <= ctraject->Duration())
-            t_traj_curr += static_cast<double>(this->getPeriod());
-        else
-            t_traj_curr = 0.0;
+    {
+        ret = qpoases_solver->hotstart(H.data(),g.data(),NULL,lb.data(),ub.data(),NULL,NULL,nWSR);
     }
-#ifdef __XENOMAI__
-	RTIME t_loop_stop = rt_timer_read();
-
-	t_loop = rt_timer_ticks2ns(t_loop_stop-t_loop_start);
-        loop_duration.data = t_loop;
-//	loop_duration.data = elapsed;
-	port_loop_duration.write(loop_duration);
-//	if(t_loop < t_optimize)
-//		log(RTT::Error) << "Negative duration"<<endlog();
-#endif
-   // ros::Duration t_elapsed = rtt_rosclock::host_now() - t_start;
-  //  elapsed = t_elapsed.toSec();
-    n_updates_++;
-}
+    
+    
+    if(ret == qpOASES::SUCCESSFUL_RETURN)
+    {
+        // Get the solution
+        qpoases_solver->getPrimalSolution(this->joint_torque_out.data());
+        // Remove gravity because Kuka already adds it
+        this->joint_torque_out -= arm.getGravityTorque().data;
+        // Send torques to the robot
+        this->port_joint_torque_out.write(this->joint_torque_out);
+    }
 
 }
+
+
+void CartOptCtrl::stopHook()
+{
+    this->has_first_command = false;
+}
+

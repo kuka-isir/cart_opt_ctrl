@@ -17,145 +17,60 @@
 #ifndef __CART_OPT_CTRL_HPP__
 #define __CART_OPT_CTRL_HPP__
 
-#include "rtt_lwr_abstract/rtt_lwr_abstract.hpp"
-#include "cart_opt_ctrl/lwr_cart_solver.hpp"
+#include <rtt_ros_kdl_tools/chain_utils.hpp>
 
-#include <eigen_conversions/eigen_msg.h>
-#include <kdl/frames.hpp>
-
-#include <kdl/frames_io.hpp>
-#include <kdl/framevel_io.hpp>
-#include <kdl/kinfam_io.hpp>
-#include <kdl/frameacc_io.hpp>
-
-#include <kdl/trajectory.hpp>
-#include <kdl/trajectory_segment.hpp>
-#include <kdl/trajectory_stationary.hpp>
-#include <kdl/trajectory_composite.hpp>
-#include <kdl/trajectory_composite.hpp>
-#include <kdl/velocityprofile_trap.hpp>
-#include <kdl/path_roundedcomposite.hpp>
-#include <kdl/rotational_interpolation_sa.hpp>
-#include <kdl/utilities/error.h>
-#include <kdl/trajectory_composite.hpp>
-
-#include <nav_msgs/Path.h>
-#include <rtt_ros_kdl_tools/chainjnttojacdotsolver.hpp>
-#include <kdl/chainiksolvervel_pinv.hpp>
-#include <kdl/chainiksolvervel_wdls.hpp>
-
-#include <unsupported/Eigen/MatrixFunctions>
-#include <geometry_msgs/WrenchStamped.h>
-#include <geometry_msgs/PoseArray.h>
-#include <std_msgs/Float64.h>
-#include <std_msgs/Float32MultiArray.h>
-#include <rtt/os/TimeService.hpp>
-#include <rtt/Time.hpp>
+#include <rtt/Component.hpp>
+#include <rtt/TaskContext.hpp>
+#include <rtt/InputPort.hpp>
+#include <rtt/OutputPort.hpp>
+#include <kdl/frameacc.hpp>
+#include <qpOASES.hpp>
+#include <memory>
 
 template <typename T>
 T clip(const T& n, const T& lower, const T& upper) {
   return std::max(lower, std::min(n, upper));
 }
 
-namespace lwr{
-  static const int PINV_SOLVER  =0;
-  static const int WDL_SOLVER   =1;
 
-  class CartOptCtrl : public RTTLWRAbstract{
-    public:
-      CartOptCtrl(const std::string& name);
-      virtual ~CartOptCtrl(){delete ctraject;};
-      bool computeTrajectory(const double radius,const double eqradius,const double vmax=0.02, const double accmax=0.1);
-      void updateHook();
-      bool configureHook();
-      static void * optimize(void * arg);
-      RTT::OutputPort<geometry_msgs::PoseStamped> port_X_curr;
-      RTT::OutputPort<geometry_msgs::PoseStamped> port_X_des;
-      RTT::OutputPort<geometry_msgs::PoseStamped> port_X_tmp;
-      RTT::OutputPort<geometry_msgs::PoseArray> port_pose_array;
-      RTT::InputPort<geometry_msgs::WrenchStamped> port_ftdata;
-      RTT::InputPort<geometry_msgs::Twist> port_spacenav;
-      RTT::OutputPort<std_msgs::Float64> port_solver_duration;
-      RTT::OutputPort<std_msgs::Float64> port_loop_duration;
-      RTT::OutputPort<nav_msgs::Path> port_path_ros;
-      RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_min;
-      RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_max;
-      RTT::OutputPort<std_msgs::Float32MultiArray> port_qdd_des;
+class CartOptCtrl : public RTT::TaskContext
+{
+public:
+    CartOptCtrl(const std::string& name);
+    virtual ~CartOptCtrl(){}
 
-      // Async update
-      RTT::OutputPort<Eigen::VectorXd> port_add_torque;
-      RTT::OutputPort<Eigen::VectorXd> port_q;
-      RTT::OutputPort<Eigen::VectorXd> port_qdot;
-      RTT::OutputPort<double> port_dt;
-      RTT::OutputPort<Eigen::MatrixXd> port_jacobian;
-      RTT::OutputPort<Eigen::MatrixXd> port_mass;
-      RTT::OutputPort<Eigen::VectorXd> port_jdot_qdot;
-      RTT::OutputPort<Eigen::VectorXd> port_coriolis;
-      RTT::OutputPort<Eigen::VectorXd> port_gravity;
-      RTT::OutputPort<Eigen::VectorXd> port_xdd_des;
-      RTT::OutputPort<bool> port_optimize_event;
+    bool configureHook();
+    bool startHook();
+    void updateHook();
+    void stopHook();
+protected:
+    // Output ports
+    RTT::OutputPort<Eigen::VectorXd> port_joint_torque_out;
+    // Input ports
+    RTT::InputPort<KDL::FrameAcc> port_traj_in;
 
-    protected:
-      double spacenav_scale_rot,spacenav_scale_trans;
-      double kdt_;
-      std_msgs::Float32MultiArray qdd_min_ros,qdd_max_ros,qdd_des_ros;
-      geometry_msgs::PoseStamped X_curr_msg,X_des_msg,X_tmp_msg;
-      bool ready_to_start_;
-      double gain_;
-      KDL::Frame frame_des_kdl;
-      Eigen::Matrix<double,6,1> X_err,Xd_err;
-      KDL::Frame frame_kdl;
-      KDL::FrameVel frame_vel_des_kdl;
-      tf::Pose cart_pos_tf,cart_pos_tf_des;
-      KDL::Wrench wrench_kdl;
-      KDL::JntArray jnt_acc_kdl;
-      Eigen::Matrix<double,6,1> F_ext;
-      KDL::Twist cart_twist_des_kdl;
+    RTT::InputPort<Eigen::VectorXd> port_joint_position_in;
+    RTT::InputPort<Eigen::VectorXd> port_joint_velocity_in;
 
-      KDL::Path_RoundedComposite* path;
-      KDL::VelocityProfile* velpref;
-      KDL::Trajectory* traject;
-      KDL::Trajectory_Composite* ctraject;
-      void publishTrajectory();
-      boost::scoped_ptr<KDL::ChainJntToJacDotSolver> jdot_solver;
-      KDL::Jacobian jdot,J_ati_base,J_ee_base;
-      KDL::Twist jdot_qdot;
-      double t_traj_curr;
+    // CHain chain_utils
+    rtt_ros_kdl_tools::ChainUtils arm;
+    Eigen::VectorXd joint_torque_out,
+                    joint_position_in,
+                    joint_velocity_in;
+    KDL::FrameAcc traj_pt_in;
+    std::string ee_frame;
+    bool has_first_command = false;
 
-      Eigen::Matrix<double,7,1> jnt_pos_eigen;
-      Eigen::Matrix<double,7,1> corr_cart;
+    KDL::Frame X_traj,X_curr;
+    KDL::Twist X_err,Xd_err,Xdd_err;
+    KDL::Twist Xd_curr,Xdd_curr,Xd_traj,Xdd_traj;
+    KDL::Twist Xdd_des;
 
-      double kp_lin,kd_lin,kp_ang,kd_ang;
-      KDL::JntArray qdd_des_kdl;
-      Eigen::VectorXd qdd_des,coriolis;
-      KDL::JntSpaceInertiaMatrix mass_kdl;
-      bool traj_computed;
-      double d_ang_max_;
-      bool debug_mode_;
-      const bool isReadyToStart()const{return ready_to_start_;};
-      KDL::Twist d_err_last;
-      bool use_jdot_qdot_,use_coriolis_,use_f_ext_,use_xdd_des_,use_ft_sensor_;
-      int jacobian_solver_type_;
-      Eigen::MatrixXd mass_inv;
-      double elapsed,dw_max_;
-      bool use_mass_sqrt_;
-      bool use_xd_des_;
-      Eigen::Matrix<double,6,1> ft_wrench;
-      KDL::Wrench ft_wrench_kdl;
-      Eigen::Matrix<double,6,1> xdd_des_;
-      Eigen::Matrix<double,6,1> jdot_qdot_;
-private:
-      bool model_verbose_;
-      double solver_duration;
-      bool use_sim_clock;
-      bool init_pos_acquired,slow_down;
-      std::string trajectory_frame;
-      geometry_msgs::WrenchStamped wrench_msg;
-      int n_updates_;
-      lwr::LWRCartOptSolver<CartOptSolverqpOASES> cart_model_solver_;
-  };
-}
+    Eigen::VectorXd P_gain,D_gain;
 
-ORO_LIST_COMPONENT_TYPE(lwr::CartOptCtrl)
-ORO_CREATE_COMPONENT_LIBRARY()
+    std::unique_ptr<qpOASES::SQProblem> qpoases_solver;
+};
+
+
+ORO_CREATE_COMPONENT(CartOptCtrl)
 #endif
