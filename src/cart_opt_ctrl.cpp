@@ -224,10 +224,35 @@ void CartOptCtrl::updateHook()
     
     double horizon_dt = 0.015;
     
-    lbA = ( qd_min - this->joint_velocity_in ) / horizon_dt + arm.getInertiaInverseMatrix().data * ( coriolis.data + gravity.data );
+    Eigen::VectorXd nonLinearTerms(arm.getNrOfJoints());
+    nonLinearTerms = arm.getInertiaInverseMatrix().data * ( coriolis.data + gravity.data );    
     
-    ubA = ( qd_max - this->joint_velocity_in ) / horizon_dt + arm.getInertiaInverseMatrix().data * ( coriolis.data + gravity.data );
+    // TODO: adapt this
+    // for( int i; i<arm.getNrOfJoints(); ++i )
+    // {
+    //     if( fabs(current_jnt_vel[i]) < 1.0e-12 ) // avoid division by zero, por favor
+    //         continue;
+    //     
+    //     // lower bound
+    //     tlim = 2.0*( jnt_pos_limit_lower[i] - current_jnt_pos[i] ) / current_jnt_vel[i];
+    //     if( tlim < 1.0e-12 ) //  tlim < 0 is of no interest, and tlim = 0 the problem is undefined
+    //         continue;
+    //     if( (0 <= tlim) && (tlim <= horizon) )
+    //         ddq_lower[i] = fmax( ddq_lower[i], -current_jnt_vel[i] / tlim  ); // ddq >= dq^2 / (2(q-qmin))
+    //         
+    //     // upper bound
+    //     tlim = 2.0*( jnt_pos_limit_upper[i] - current_jnt_pos[i] ) / current_jnt_vel[i];
+    //     if( tlim < 1.0e-12 ) //  tlim < 0 is of no interest, and tlim = 0 the problem is undefined
+    //         continue;
+    //     if( (0 <= tlim) && (tlim <= horizon) )
+    //         ddq_upper[i] = fmin( ddq_upper[i], -current_jnt_vel[i] / tlim  ); // ddq <= dq^2 / (2(q-qmax))
+    // }
+
+    lbA = (( qd_min - this->joint_velocity_in ) / horizon_dt + nonLinearTerms).cwiseMax(
+                    2*(arm.getJointLowerLimit() - this->joint_position_in - this->joint_velocity_in * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
     
+    ubA = (( qd_max - this->joint_velocity_in ) / horizon_dt + nonLinearTerms).cwiseMin(
+                    2*(arm.getJointUpperLimit() - this->joint_position_in - this->joint_velocity_in * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
     
     
     // number of allowed compute steps
