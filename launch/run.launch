@@ -35,8 +35,8 @@
     <arg name="log_level" default="error" />
     <!-- Tools -->
     <arg name="load_base" default="true" />
+    <arg name="load_table" default="true" />
     <arg name="load_ati_sensor" default="true" />
-    <arg name="load_calib_tool" default="true" />
     <arg name="load_handle" default="true" />
     <!-- Gazebo -->
     <arg name="gazebo_gui" default="false"/>
@@ -44,26 +44,8 @@
 
     <!-- The parameters that the CartOptCtrl sensor will get -->
     <rosparam ns="CartOptCtrl" subst_value="true">
-        kp_lin: 600.0
-        kd_lin: 10.0
-        kp_ang: 250.0
-        kd_ang: 5.0
-        trajectory_frame: ati_link
-        dx_ang_max: 100.0
-        dw_max: 0.1
-        use_jdot_qdot: true
-        use_f_ext: true
-        use_coriolis: true
-        use_xd_des: true
-        use_coriolis: true
-        use_xdd_des: true
-        use_ft_sensor: false
-        use_damping: false
-        use_nso: false
-        kp_ref: 100.0
-        damping: 10.0
-        spacenav_scale_trans: 0.0001
-        spacenav_scale_rot: 0.0001
+        P_gain : [100,100,100,30,30,30]
+        D_gain : [10,10,10,2,2,2]
     </rosparam>
 
 <!--============ LWR Runner script ===============-->
@@ -77,8 +59,8 @@
         <arg name="log_level" value="$(arg log_level)" />
         <arg name="tip_link" value="$(arg tip_link)"/>
         <arg name="load_base" value="$(arg load_base)" />
+        <arg name="load_table" value="$(arg load_table)" />
         <arg name="load_ati_sensor" value="$(arg load_ati_sensor)" />
-        <arg name="load_calib_tool" value="$(arg load_calib_tool)" />
         <arg name="load_handle" value="$(arg load_handle)" />
         <arg name="gazebo_gui" value="$(arg gazebo_gui)"/>
     </include>
