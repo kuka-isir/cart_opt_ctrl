@@ -22,6 +22,9 @@ connectPeers("CartOptCtrl",getRobotName())
 
 connectStandardPorts("CartOptCtrl",getRobotName(),ConnPolicy())
 
+stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
+
+
 configureComponent("CartOptCtrl")
 
 startComponent("CartOptCtrl")

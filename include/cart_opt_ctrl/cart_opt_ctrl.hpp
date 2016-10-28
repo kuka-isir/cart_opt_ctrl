@@ -27,6 +27,9 @@
 #include <qpOASES.hpp>
 #include <memory>
 
+#include <geometry_msgs/Pose.h>
+
+
 template <typename T>
 T clip(const T& n, const T& lower, const T& upper) {
   return std::max(lower, std::min(n, upper));
@@ -46,6 +49,7 @@ public:
 protected:
     // Output ports
     RTT::OutputPort<Eigen::VectorXd> port_joint_torque_out;
+    RTT::OutputPort<geometry_msgs::Pose> port_x_des;
     // Input ports
     RTT::InputPort<KDL::FrameAcc> port_traj_in;
 

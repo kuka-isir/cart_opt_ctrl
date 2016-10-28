@@ -1,6 +1,7 @@
 #include "cart_opt_ctrl/cart_opt_ctrl.hpp"
 #include <eigen_conversions/eigen_kdl.h>
 #include <kdl/frames_io.hpp>
+#include <kdl_conversions/kdl_msg.h>
 
 using namespace RTT;
 using namespace KDL;
@@ -11,6 +12,7 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
     this->addPort("JointVelocity",this->port_joint_velocity_in);
     this->addPort("JointTorqueCommand",this->port_joint_torque_out);
     this->addPort("TrajectoryPointIn",this->port_traj_in);
+    this->addPort("PoseDesired",this->port_x_des);
     
     this->addProperty("FrameOfInterest",this->ee_frame).doc("The robot frame to track the trajectory");
     this->addProperty("P_gain",this->P_gain).doc("Proportional gain");
@@ -47,25 +49,25 @@ bool CartOptCtrl::configureHook()
     
     
     // For now we have 0 constraints for now
-    int number_of_constraints = 0;
-    this->qpoases_solver.reset(new qpOASES::SQProblem(dof,number_of_constraints));
+    int number_of_variables = dof;
+    int number_of_constraints = dof;
+    this->qpoases_solver.reset(new qpOASES::SQProblem(number_of_variables,number_of_constraints,qpOASES::HST_POSDEF));
     
     // Resize and set torque at zero
     this->joint_torque_out.setZero(dof);
     this->joint_position_in.setZero(dof);
     this->joint_velocity_in.setZero(dof);
     
-    
     // QPOases options
     qpOASES::Options options;
     // This options enables regularisation (required) and disable
     // some checks to be very fast !
-    //options.setToMPC();
-    options.enableRegularisation = qpOASES::BT_TRUE;
-    
-    this->qpoases_solver->setOptions(options);
-    // Remove verbosity
-    this->qpoases_solver->setPrintLevel(qpOASES::PL_NONE/*qpOASES::PL_DEBUG_ITER*/);
+    // options.setToDefault();
+    options.setToMPC(); // setToReliable() // setToDefault()
+    options.enableRegularisation = qpOASES::BT_FALSE; // since we specify the type of Hessian matrix, we do not need automatic regularisation
+    options.enableEqualities = qpOASES::BT_TRUE; // Specifies whether equalities shall be  always treated as active constraints.
+    this->qpoases_solver->setOptions( options );
+    this->qpoases_solver->setPrintLevel(qpOASES::PL_NONE); // PL_HIGH for full output, PL_NONE for... none
     
     return true;
 }
@@ -103,7 +105,7 @@ void CartOptCtrl::updateHook()
     KDL::SetToZero(Xdd_traj);  
     
     // If we get a new trajectory point to track
-    if(this->port_traj_in.read(this->traj_pt_in) != RTT::NoData)
+    if(false && this->port_traj_in.read(this->traj_pt_in) != RTT::NoData)
     {
         // Then overrride the desired
         X_traj = this->traj_pt_in.GetFrame();
@@ -122,17 +124,21 @@ void CartOptCtrl::updateHook()
         has_first_command = true;
     }
     
+    // Debug publish in ROS
+    geometry_msgs::Pose x_des_pos_out;
+    tf::poseKDLToMsg(X_traj,x_des_pos_out);
+    this->port_x_des.write(x_des_pos_out);
+    
+    
     // Compute errors
     X_err = diff( X_curr , X_traj );
     Xd_err = diff( Xd_curr , Xd_traj);
     
-    KDL::Twist kp_,kd_;
-    
-    tf::twistEigenToKDL(this->P_gain,kp_);
-    tf::twistEigenToKDL(this->D_gain,kd_);
-    
-    Xdd_des.vel = Xdd_traj.vel + kp_.vel * ( X_err.vel ) + kd_.vel * ( Xd_err.vel );
-    Xdd_des.rot = Xdd_traj.rot + kp_.rot * ( X_err.rot ) + kd_.rot * ( Xd_err.rot );
+    // Apply PD 
+    for( unsigned int i=0; i<6; ++i )
+    {
+        Xdd_des(i) = Xdd_traj(i) + this->P_gain(i) * ( X_err(i) ) + this->D_gain(i) * ( Xd_err(i) );
+    }
     
     Eigen::Matrix<double,6,1> xdd_des;
     tf::twistKDLToEigen(Xdd_des,xdd_des);
@@ -163,10 +169,10 @@ void CartOptCtrl::updateHook()
     // With a = J.Minv
     //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
 
-    Eigen::MatrixXd a;
+    Eigen::Matrix<double,6,Eigen::Dynamic> a;
     a.resize(6,arm.getNrOfJoints());
     
-    Eigen::Matrix<double,6,1> b;
+    Eigen::Matrix<double,6,1> b;;
     
     a.noalias() = J.data * M_inv.data;
     b.noalias() = - a * ( coriolis.data + gravity.data ) + jdot_qdot - xdd_des;
@@ -176,15 +182,14 @@ void CartOptCtrl::updateHook()
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> H;
     H.resize(arm.getNrOfJoints(),arm.getNrOfJoints());
     
-    Eigen::VectorXd g;
-    g.resize(arm.getNrOfJoints());
+    Eigen::VectorXd g(arm.getNrOfJoints());
     
     Eigen::MatrixXd regularisation;
     regularisation.resize( arm.getNrOfJoints(), arm.getNrOfJoints() );
     regularisation.setIdentity();
-    regularisation *= 1.0e-6;
+    regularisation *= 1.0e-8;
     
-    H = 2.0 * a.transpose() * a /*+ regularisation*/;
+    H = 2.0 * a.transpose() * a + regularisation;
     g = 2.0 * a.transpose() * b;
     
     // TODO: get this from URDF
@@ -197,16 +202,36 @@ void CartOptCtrl::updateHook()
     torque_min = -torque_max; // N.m
     
     // Compute bounds
-    Eigen::VectorXd lb,ub;
-    lb.resize(arm.getNrOfJoints());
-    ub.resize(arm.getNrOfJoints());
+    Eigen::VectorXd lb(arm.getNrOfJoints()),
+                    ub(arm.getNrOfJoints());
     
     //TODO : write constraints for q and qdot
     lb = torque_min;
     ub = torque_max;
     
+    
+    // Update Constraints
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(arm.getNrOfJoints(),arm.getNrOfJoints());
+    Eigen::VectorXd lbA(arm.getNrOfJoints()),
+                    ubA(arm.getNrOfJoints()),
+                    qd_min(arm.getNrOfJoints()),
+                    qd_max(arm.getNrOfJoints());
+    
+    qd_min.setConstant(-1.0);
+    qd_max.setConstant(1.0);
+    
+    A = arm.getInertiaInverseMatrix().data;
+    
+    double horizon_dt = 0.015;
+    
+    lbA = ( qd_min - this->joint_velocity_in ) / horizon_dt + arm.getInertiaInverseMatrix().data * ( coriolis.data + gravity.data );
+    
+    ubA = ( qd_max - this->joint_velocity_in ) / horizon_dt + arm.getInertiaInverseMatrix().data * ( coriolis.data + gravity.data );
+    
+    
+    
     // number of allowed compute steps
-    int nWSR = 1000; 
+    int nWSR = 1e6; 
     
     // Let's compute !
     qpOASES::returnValue ret;
@@ -215,7 +240,7 @@ void CartOptCtrl::updateHook()
     if(!qpoases_initialized)
     {
         // Initialise the problem, once it has found a solution, we can hotstart
-        ret = qpoases_solver->init(H.data(),g.data(),NULL,lb.data(),ub.data(),NULL,NULL,nWSR);
+        ret = qpoases_solver->init(H.data(),g.data(),A.data(),lb.data(),ub.data(),lbA.data(),ubA.data(),nWSR);
         
         // Keep init if it didn't work
         if(ret == qpOASES::SUCCESSFUL_RETURN)
@@ -226,7 +251,12 @@ void CartOptCtrl::updateHook()
     else
     {
         // Otherwise let's reuse the previous solution to find a solution faster
-        ret = qpoases_solver->hotstart(H.data(),g.data(),NULL,lb.data(),ub.data(),NULL,NULL,nWSR);
+        ret = qpoases_solver->hotstart(H.data(),g.data(),A.data(),lb.data(),ub.data(),lbA.data(),ubA.data(),nWSR);
+        
+        if(ret != qpOASES::SUCCESSFUL_RETURN)
+        {
+            qpoases_initialized = false;
+        }
     }
     
     // Zero grav if not found
