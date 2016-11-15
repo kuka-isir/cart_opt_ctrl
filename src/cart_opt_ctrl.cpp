@@ -105,7 +105,7 @@ void CartOptCtrl::updateHook()
     KDL::SetToZero(Xdd_traj);  
     
     // If we get a new trajectory point to track
-    if(false && this->port_traj_in.read(this->traj_pt_in) != RTT::NoData)
+    if(this->port_traj_in.read(this->traj_pt_in) != RTT::NoData)
     {
         // Then overrride the desired
         X_traj = this->traj_pt_in.GetFrame();
@@ -187,7 +187,7 @@ void CartOptCtrl::updateHook()
     Eigen::MatrixXd regularisation;
     regularisation.resize( arm.getNrOfJoints(), arm.getNrOfJoints() );
     regularisation.setIdentity();
-    regularisation *= 1.0e-8;
+    regularisation *= 1.0e-5;
     
     H = 2.0 * a.transpose() * a + regularisation;
     g = 2.0 * a.transpose() * b;
