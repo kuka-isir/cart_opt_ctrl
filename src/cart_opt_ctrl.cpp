@@ -11,12 +11,17 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
     this->addPort("JointPosition",this->port_joint_position_in);
     this->addPort("JointVelocity",this->port_joint_velocity_in);
     this->addPort("JointTorqueCommand",this->port_joint_torque_out);
-    this->addPort("TrajectoryPointIn",this->port_traj_in);
+    this->addPort("TrajectoryPointIn",this->port_traj_point_in);
+    this->addPort("TrajectoryJointIn",this->port_traj_joint_in);
     this->addPort("PoseDesired",this->port_x_des);
     
     this->addProperty("FrameOfInterest",this->ee_frame).doc("The robot frame to track the trajectory");
     this->addProperty("P_gain",this->P_gain).doc("Proportional gain");
     this->addProperty("D_gain",this->D_gain).doc("Derivative gain");
+    this->addProperty("P_joint_gain",this->P_joint_gain).doc("Proportional gain");
+    this->addProperty("D_joint_gain",this->D_joint_gain).doc("Derivative gain");
+    this->addProperty("Alpha",this->Alpha).doc("weight for joint goal in QP");
+    this->addProperty("Regularisation",this->Regularisation).doc("weight for the regularisation in QP");
 }
 
 bool CartOptCtrl::configureHook()
@@ -33,6 +38,15 @@ bool CartOptCtrl::configureHook()
     // Not using Matrix<double,6,1> because of ops script limitations
     this->P_gain.resize(6);
     this->D_gain.resize(6);
+    this->P_joint_gain.resize(dof);
+    this->D_joint_gain.resize(dof);
+    this->qdd_des.resize(dof);
+    this->q_traj.resize(dof);
+    this->qd_traj.resize(dof);
+    this->qdd_traj.resize(dof);
+    this->q_curr.resize(dof);
+    this->qd_curr.resize(dof);
+    this->qdd_curr.resize(dof);
     
     // Let's use the last segment to track by default
     this->ee_frame = arm.getSegmentName( arm.getNrOfSegments() - 1 );
@@ -40,6 +54,12 @@ bool CartOptCtrl::configureHook()
     // Default gains, works but stiff
     this->P_gain << 1000,1000,1000,300,300,300;
     this->D_gain << 50,50,50,10,10,10;
+    this->P_joint_gain << 450.0, 450.0, 80.0, 450.0, 80.0, 20.0, 1.0;
+    this->D_joint_gain << 20.0, 20.0, 1.5, 20.0, 1.5, 1.0, 0.05;
+    
+    // Default Alpha value
+    this->Alpha = 1e-03;
+    this->Regularisation = 1e-05;
     
     // Match all properties (defined in the constructor) 
     // with the rosparams in the namespace : 
@@ -99,19 +119,26 @@ void CartOptCtrl::updateHook()
     // Get Current end effector Pose
     X_curr = arm.getSegmentPosition(this->ee_frame);
     Xd_curr = arm.getSegmentVelocity(this->ee_frame);
+    q_curr = arm.getJointPositions();
+    qd_curr = arm.getJointVelocities();
 
     // Initialize the desired velocity and acceleration to zero
     KDL::SetToZero(Xd_traj);
-    KDL::SetToZero(Xdd_traj);  
+    KDL::SetToZero(Xdd_traj);
+    KDL::SetToZero(qd_traj);
+    KDL::SetToZero(qdd_traj);
     
     // If we get a new trajectory point to track
-    if(this->port_traj_in.read(this->traj_pt_in) != RTT::NoData)
+    if((this->port_traj_point_in.read(this->traj_pt_in) != RTT::NoData) && (this->port_traj_joint_in.read(this->traj_joint_in) != RTT::NoData) )
     {
         // Then overrride the desired
         X_traj = this->traj_pt_in.GetFrame();
         Xd_traj = this->traj_pt_in.GetTwist();
         Xdd_traj = this->traj_pt_in.GetAccTwist();
-
+        q_traj = this->traj_joint_in.q;
+        qd_traj = this->traj_joint_in.qdot;
+        qdd_traj = this->traj_joint_in.qdotdot;
+        
         has_first_command = true;
     }
     
@@ -120,7 +147,8 @@ void CartOptCtrl::updateHook()
     {
         // Stay at the same position
         X_traj = X_curr;
-                
+        q_traj = q_curr;
+        
         has_first_command = true;
     }
     
@@ -134,11 +162,15 @@ void CartOptCtrl::updateHook()
     X_err = diff( X_curr , X_traj );
     Xd_err = diff( Xd_curr , Xd_traj);
     
+    
     // Apply PD 
     for( unsigned int i=0; i<6; ++i )
     {
         Xdd_des(i) = Xdd_traj(i) + this->P_gain(i) * ( X_err(i) ) + this->D_gain(i) * ( Xd_err(i) );
     }
+    for(unsigned int i=0; i< this->arm.getNrOfJoints(); ++i){
+        qdd_des(i) = qdd_traj(i) + this->P_joint_gain(i) * ( q_traj(i) - q_curr(i) ) + this->D_joint_gain(i) * ( qd_traj(i) - qd_curr(i) );
+    }    
     
     Eigen::Matrix<double,6,1> xdd_des;
     tf::twistKDLToEigen(Xdd_des,xdd_des);
@@ -171,11 +203,17 @@ void CartOptCtrl::updateHook()
 
     Eigen::Matrix<double,6,Eigen::Dynamic> a;
     a.resize(6,arm.getNrOfJoints());
+    Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> a2;
+    a2.resize(arm.getNrOfJoints(),arm.getNrOfJoints());
     
-    Eigen::Matrix<double,6,1> b;;
+    Eigen::Matrix<double,6,1> b;
+    Eigen::Matrix<double,Eigen::Dynamic,1> b2;
+    b2.resize(arm.getNrOfJoints(),1);
     
     a.noalias() = J.data * M_inv.data;
+    a2.noalias() = M_inv.data;
     b.noalias() = - a * ( coriolis.data + gravity.data ) + jdot_qdot - xdd_des;
+    b2.noalias() = - a2 * ( coriolis.data + gravity.data ) - qdd_des;
     
     // Matrices for qpOASES
     // NOTE: We need RowMajor (see qpoases doc)
@@ -187,10 +225,10 @@ void CartOptCtrl::updateHook()
     Eigen::MatrixXd regularisation;
     regularisation.resize( arm.getNrOfJoints(), arm.getNrOfJoints() );
     regularisation.setIdentity();
-    regularisation *= 1.0e-5;
+    regularisation *= this->Regularisation;
     
-    H = 2.0 * a.transpose() * a + regularisation;
-    g = 2.0 * a.transpose() * b;
+    H = 2.0 * a.transpose() * a + this->Alpha* 2.0 * a2.transpose() * a2 + regularisation;
+    g = 2.0 * a.transpose() * b + this->Alpha* 2.0 * a2.transpose() * b2;
     
     // TODO: get this from URDF
     Eigen::VectorXd torque_max;

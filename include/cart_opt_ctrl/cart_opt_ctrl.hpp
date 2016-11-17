@@ -51,8 +51,9 @@ protected:
     RTT::OutputPort<Eigen::VectorXd> port_joint_torque_out;
     RTT::OutputPort<geometry_msgs::Pose> port_x_des;
     // Input ports
-    RTT::InputPort<KDL::FrameAcc> port_traj_in;
-
+    RTT::InputPort<KDL::FrameAcc> port_traj_point_in;
+    RTT::InputPort<KDL::JntArrayAcc> port_traj_joint_in;
+    
     RTT::InputPort<Eigen::VectorXd> port_joint_position_in;
     RTT::InputPort<Eigen::VectorXd> port_joint_velocity_in;
 
@@ -62,15 +63,20 @@ protected:
                     joint_position_in,
                     joint_velocity_in;
     KDL::FrameAcc traj_pt_in;
+    KDL::JntArrayAcc traj_joint_in;
+    
     std::string ee_frame;
     bool has_first_command = false;
 
     KDL::Frame X_traj,X_curr;
     KDL::Twist X_err,Xd_err,Xdd_err;
     KDL::Twist Xd_curr,Xdd_curr,Xd_traj,Xdd_traj;
+    KDL::JntArray q_curr, qd_curr, qdd_curr, q_traj, qd_traj, qdd_traj;
     KDL::Twist Xdd_des;
-
-    Eigen::VectorXd P_gain,D_gain;
+    Eigen::VectorXd qdd_des;
+    double Alpha, Regularisation;
+    
+    Eigen::VectorXd P_gain,D_gain,P_joint_gain,D_joint_gain;
 
     std::unique_ptr<qpOASES::SQProblem> qpoases_solver;
 };

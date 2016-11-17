@@ -46,6 +46,10 @@
     <rosparam ns="CartOptCtrl" subst_value="true">
         P_gain : [100,100,100,30,30,30]
         D_gain : [10,10,10,2,2,2]
+        P_joint_gain : [450.0, 450.0, 80.0, 450.0, 80.0, 20.0, 1.0]
+        D_joint_gain : [20.0, 20.0, 1.5, 20.0, 1.5, 1.0, 0.05]
+        Alpha : 0.001
+        Regularisation : 0.00001
     </rosparam>
 
 <!--============ LWR Runner script ===============-->
