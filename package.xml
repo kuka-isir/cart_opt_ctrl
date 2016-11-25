@@ -27,6 +27,7 @@
   <build_depend>realtime_tools</build_depend>
   <build_depend>control_msgs</build_depend>
   <build_depend>trajectory_msgs</build_depend>
+  <build_depend>qpOASES</build_depend>
 
   <run_depend>rtt_ros_kdl_tools</run_depend>
   <run_depend>rtt_roscomm</run_depend>
@@ -43,6 +44,8 @@
   <run_depend>realtime_tools</run_depend>
   <run_depend>control_msgs</run_depend>
   <run_depend>trajectory_msgs</run_depend>
+  <run_depend>rtt_moveit_msgs</run_depend>
+  <run_depend>qpOASES</run_depend>
 
   <export>
     <rtt_ros>
@@ -58,6 +61,7 @@
       <plugin_depend>rtt_roscomm</plugin_depend>
       <plugin_depend>rtt_rospack</plugin_depend>
       <plugin_depend>rtt_nav_msgs</plugin_depend>
+      <plugin_depend>rtt_moveit_msgs</plugin_depend>
     </rtt_ros>
     <controller_interface plugin="${prefix}/ros_control_plugins.xml"/>
   </export>
