@@ -5,12 +5,21 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 find_package(catkin REQUIRED COMPONENTS
     rtt_ros
+    rtt_ros_kdl_tools
     trac_ik_lib
     kdl_conversions
     eigen_conversions
     cmake_modules
     qpOASES
+    controller_interface
+    actionlib
+    roscpp
+    realtime_tools
+    control_msgs
+    trajectory_msgs
+    controller_manager
 )
+
 
 find_package(Eigen REQUIRED)
 find_package(orocos_kdl REQUIRED)
@@ -23,11 +32,13 @@ include_directories(
     ${USE_OROCOS_INCLUDE_DIRS}
 )
 
+## Declare controller library
+add_library(cart_opt_controllers src/ros_cart_opt_ctrl.cpp)
+target_link_libraries(cart_opt_controllers ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
 orocos_component(${PROJECT_NAME} src/${PROJECT_NAME}.cpp)
 
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMPONENT)
-
-
 
 target_link_libraries(${PROJECT_NAME}
     ${catkin_LIBRARIES}

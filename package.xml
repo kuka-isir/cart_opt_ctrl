@@ -20,7 +20,13 @@
   <build_depend>rtt_rosclock</build_depend>
   <build_depend>rtt_ros_kdl_tools</build_depend>
   <build_depend>trac_ik_lib</build_depend>
-
+  <build_depend>controller_interface</build_depend>
+  <build_depend>cmake_modules</build_depend>
+  <build_depend>actionlib</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>realtime_tools</build_depend>
+  <build_depend>control_msgs</build_depend>
+  <build_depend>trajectory_msgs</build_depend>
 
   <run_depend>rtt_ros_kdl_tools</run_depend>
   <run_depend>rtt_roscomm</run_depend>
@@ -31,6 +37,12 @@
   <run_depend>orocos_kdl</run_depend>
   <run_depend>kdl_conversions</run_depend>
   <run_depend>eigen_conversions</run_depend>
+  <run_depend>controller_interface</run_depend>
+  <run_depend>actionlib</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>realtime_tools</run_depend>
+  <run_depend>control_msgs</run_depend>
+  <run_depend>trajectory_msgs</run_depend>
 
   <export>
     <rtt_ros>
@@ -47,5 +59,6 @@
       <plugin_depend>rtt_rospack</plugin_depend>
       <plugin_depend>rtt_nav_msgs</plugin_depend>
     </rtt_ros>
+    <controller_interface plugin="${prefix}/ros_control_plugins.xml"/>
   </export>
 </package>

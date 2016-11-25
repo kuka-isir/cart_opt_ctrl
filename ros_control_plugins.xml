@@ -1,0 +1,7 @@
+<library path="lib/libcart_opt_controllers">
+  <class name="cart_opt_controllers/JointTrajectoryController" type="cart_opt_controllers::JointTrajectoryController" base_class_type="controller_interface::ControllerBase">
+  <description>
+      This controller tracks the cartesian trajectory commands. It expects a EffortJointInterface type of hardware interface.
+  </description>
+  </class>
+</library>
