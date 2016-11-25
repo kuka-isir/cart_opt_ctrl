@@ -1,51 +1,62 @@
-<?xml version="1.0" encoding="UTF-8" ?>
 <launch>
-<!--============ Add new models in path ===========-->
-	<env name="GAZEBO_MODEL_PATH" value="$(find cart_opt_ctrl)/models:GAZEBO_MODEL_PATH"/>
-
-<!--============ ATI F/T Sensor Params ============-->
-
-    <!-- The ATI Sensor default ip -->
-    <arg name="ft_ip" default="192.168.100.103"/>
-    <!-- The ATI Sensor calibration index (-1 is 'use default') -->
-    <arg name="ft_calibration_index" default="-1"/>
-    <!-- The name of the Wrench frame -->
-    <arg name="ft_frame" default="ati_link"/>
-
-    <!-- The parameters that the ft_component sensor will get -->
-    <rosparam ns="ft_sensor" subst_value="true">
-        ip: $(arg ft_ip)
-        calibration_index: $(arg ft_calibration_index)
-        frame: $(arg ft_frame)
-    </rosparam>
-
 <!--============ LWR Runner script Params ========-->
 
     <!-- The end effector frame (you'll be able to use frames <= tip_link for cartesian position, jacobians etc.) -->
-    <arg name="tip_link" default="ati_link"/>
+    <arg name="tip_link" default="link_7"/>
     <!-- Run Simulated robot (need to 'roslaunch rtt_lwr_gazebo lwr_gazebo.launch' first) -->
     <arg name="sim" default="false" />
-    <!-- The global namespace if you need to change it (unlikely) -->
-    <arg name="robot_ns" default="/"/>
     <!-- Run in GDB -->
     <arg name="debug" default="false" />
     <!-- Launch rviz -->
-    <arg name="rviz" default="true" />
+    <arg name="rviz" default="false" />
+    <arg name="moveit_rviz" default="true"/>
     <!-- The level of verbose (never, fatal, critical, error, warning, info, debug, realtime) -->
-    <arg name="log_level" default="error" />
+    <arg name="log_level" default="warning" />
     <!-- Tools -->
     <arg name="load_base" default="true" />
-    <arg name="load_table" default="true" />
     <arg name="load_ati_sensor" default="true" />
+    <arg name="load_calib_tool" default="true" />
+    <arg name="load_table" default="true" />
     <arg name="load_handle" default="true" />
+    <arg name="load_head_cam" default="true" />
+    <arg name="load_screwdriver" default="true" />
     <!-- Gazebo -->
     <arg name="gazebo_gui" default="false"/>
-<!--============ CartOptCtrl Params ============-->
 
-    <!-- The parameters that the CartOptCtrl sensor will get -->
+    <!-- MoveIt! -->
+    <arg name="launch_moveit" default="true"/>
+
+<!--     <arg name="spawn_ros_controllers" default="joint_state_controller"/> -->
+    <arg name="spawn_ros_controllers" default="joint_state_controller joint_traj_controller"/>
+    
+    <rosparam>
+      # Joint state publisher
+      joint_state_controller:
+        type: joint_state_controller/JointStateController
+        publish_rate: 50
+
+      # Joint trajectory controller
+      joint_traj_controller:
+        type: cart_opt_controllers/JointTrajectoryController
+        joints: 
+          - joint_0
+          - joint_1
+          - joint_2
+          - joint_3
+          - joint_4
+          - joint_5
+          - joint_6
+    </rosparam>
+    
+    <!-- The parameters for the CartTrajInterp component -->
+    <rosparam ns="CartTrajInterp" subst_value="true">
+        SampleDuration : 0.001
+    </rosparam>
+    
+    <!-- The parameters for the CartOptCtrl component -->
     <rosparam ns="CartOptCtrl" subst_value="true">
-        P_gain : [100,100,100,30,30,30]
-        D_gain : [10,10,10,2,2,2]
+        P_gain : [1000,1000,1000,300,300,300]
+        D_gain : [50,50,50,10,10,10]
         P_joint_gain : [450.0, 450.0, 80.0, 450.0, 80.0, 20.0, 1.0]
         D_joint_gain : [20.0, 20.0, 1.5, 20.0, 1.5, 1.0, 0.05]
         Alpha : 0.001
@@ -54,19 +65,28 @@
 
 <!--============ LWR Runner script ===============-->
 
-    <include file="$(find lwr_utils)/launch/run.launch">
-        <arg name="sim" value="$(arg sim)" />
-        <arg name="ops_script" value="$(find cart_opt_ctrl)/scripts/run.ops"/>
-        <arg name="robot_ns" value="$(arg robot_ns)"/>
-        <arg name="debug" value="$(arg debug)" />
-        <arg name="rviz" value="$(arg rviz)" />
-        <arg name="log_level" value="$(arg log_level)" />
-        <arg name="tip_link" value="$(arg tip_link)"/>
-        <arg name="load_base" value="$(arg load_base)" />
-        <arg name="load_table" value="$(arg load_table)" />
-        <arg name="load_ati_sensor" value="$(arg load_ati_sensor)" />
-        <arg name="load_handle" value="$(arg load_handle)" />
-        <arg name="gazebo_gui" value="$(arg gazebo_gui)"/>
-    </include>
+<include file="$(find lwr_utils)/launch/run.launch">
+    <arg name="sim" value="$(arg sim)" />
+    <arg name="ops_script" value="$(find cart_opt_ctrl)/scripts/run.ops"/>
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="rviz" value="$(arg rviz)" />
+    <arg name="log_level" value="$(arg log_level)" />
+    <arg name="tip_link" value="$(arg tip_link)"/>
+    <arg name="load_base" value="$(arg load_base)" />
+    <arg name="load_ati_sensor" value="$(arg load_ati_sensor)" />
+    <arg name="load_calib_tool" value="$(arg load_calib_tool)" />
+    <arg name="load_table" value="$(arg load_table)" />
+    <arg name="load_handle" value="$(arg load_handle)" />
+    <arg name="load_head_cam" value="$(arg load_head_cam)" />
+    <arg name="load_screwdriver" value="$(arg load_screwdriver)" />
+    <arg name="gazebo_gui" value="$(arg gazebo_gui)"/>
+</include>
+
+<include file="$(find lwr_moveit_config)/launch/lwr.launch" if="$(arg launch_moveit)">
+	<arg name="moveit_rviz" value="$(arg moveit_rviz)"/>
+</include>
+
+<node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+    output="screen" args="$(arg spawn_ros_controllers)"/>
 
 </launch>

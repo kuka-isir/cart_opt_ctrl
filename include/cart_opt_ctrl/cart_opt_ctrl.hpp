@@ -82,5 +82,5 @@ protected:
 };
 
 
-ORO_CREATE_COMPONENT(CartOptCtrl)
+ORO_LIST_COMPONENT_TYPE( CartOptCtrl )
 #endif

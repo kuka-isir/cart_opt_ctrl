@@ -36,8 +36,7 @@ include_directories(
 add_library(cart_opt_controllers src/ros_cart_opt_ctrl.cpp)
 target_link_libraries(cart_opt_controllers ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
-orocos_component(${PROJECT_NAME} src/${PROJECT_NAME}.cpp)
-
+orocos_component(${PROJECT_NAME} src/${PROJECT_NAME}.cpp src/cart_traj_interp.cpp)
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMPONENT)
 
 target_link_libraries(${PROJECT_NAME}
