@@ -24,19 +24,19 @@ class CartOptEffortJointInterface : public JointCommandInterface {};
  *     - head_1_joint
  *     - head_2_joint
  *   cartesian_gains:
- *     p_gains: [1000.0, 1000.0, 1000.0, 300.0, 300.0 ,300.0]
- *     d_gains: [50.0, 50.0 ,50.0 ,10.0 ,10.0 ,10.0]
+ *     p_gains: [1000.0, 1000.0, 1000.0, 300.0, 300.0, 300.0]
+ *     d_gains: [50.0, 50.0, 50.0, 10.0, 10.0, 10.0]
  *   regularisation_weights:
  *     joints: 1.0e-03
  *     tau: 1.0e-05
- *   gains:
- *     head_1_joint: {p: 200.0, d: 1.0}
- *     head_2_joint: {p: 200.0, d: 1.0}
+ *   joint_gains:
+ *     p_gains: [450.0, 450.0, 80.0, 450.0, 80.0, 20.0, 1.0]
+ *     d_gains: [20.0, 20.0, 1.5, 20.0, 1.5, 1.0, 0.05]
  *   constraints:
  *     goal_time: 0.6
  *     stopped_velocity_tolerance: 0.02
- *     head_1_joint: {trajectory: 0.05, goal: 0.02}
- *     head_2_joint: {trajectory: 0.05, goal: 0.02}
+ *     #head_1_joint: {trajectory: 0.05, goal: 0.02} # not required because following cartesian path
+ *     #head_2_joint: {trajectory: 0.05, goal: 0.02} # not required because following cartesian path
  *   stop_trajectory_duration: 0.5
  *   state_publish_rate:  25
  * \endcode
@@ -153,11 +153,6 @@ public:
       controller_nh.getParam("regularisation_weights/joints", Alpha);
     if (controller_nh.hasParam("regularisation_weights/tau"))
       controller_nh.getParam("regularisation_weights/tau", Regularisation);
-
-    for(unsigned int i=0; i<dof; i++){
-      ROS_ERROR_STREAM("P_joint_gains["<<i<<"]="<<P_joint_gain(i));
-      ROS_ERROR_STREAM("D_joint_gains["<<i<<"]="<<D_joint_gain(i));
-    }
     
     // Initialize qpoases solver
     int number_of_variables = dof;
