@@ -33,7 +33,8 @@ include_directories(
 )
 
 ## Declare controller library
-add_library(cart_opt_controllers src/ros_cart_opt_ctrl.cpp)
+# add_library(cart_opt_controllers src/ros_cart_opt_ctrl.cpp)
+add_library(cart_opt_controllers src/cart_opt_controller.cpp)
 target_link_libraries(cart_opt_controllers ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 orocos_component(${PROJECT_NAME} src/${PROJECT_NAME}.cpp src/cart_traj_interp.cpp)
