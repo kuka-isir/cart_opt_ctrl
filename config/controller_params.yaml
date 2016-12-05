@@ -1,0 +1,25 @@
+cart_opt_controller:
+  type: cart_opt_controllers/JointTrajectoryController
+  joints: 
+    - joint_0
+    - joint_1
+    - joint_2
+    - joint_3
+    - joint_4
+    - joint_5
+    - joint_6
+  cartesian_gains:
+    p_gains: [700.0, 700.0, 700.0, 200.0, 200.0, 200.0]
+    d_gains: [20.0, 20.0, 20.0, 10.0, 10.0, 10.0]
+  regularisation_weights:
+    joints: 1.0e-03
+    tau: 1.0e-09
+  joint_gains:
+    p_gains: [450.0, 450.0, 80.0, 450.0, 80.0, 20.0, 1.0]
+    d_gains: [20.0, 20.0, 1.5, 20.0, 1.5, 1.0, 0.05]
+  constraints:
+    goal_time: 0.6
+    stopped_velocity_tolerance: 0.02
+    # joint_0: {trajectory: 3.6, goal: 3.6} #trajectory does not have to be followed
+  stop_trajectory_duration: 0.5
+  state_publish_rate:  50

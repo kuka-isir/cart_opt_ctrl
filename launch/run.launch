@@ -15,11 +15,11 @@
     <!-- Tools -->
     <arg name="load_base" default="true" />
     <arg name="load_ati_sensor" default="true" />
-    <arg name="load_calib_tool" default="true" />
+    <arg name="load_calib_tool" default="false" />
     <arg name="load_table" default="true" />
     <arg name="load_handle" default="true" />
-    <arg name="load_head_cam" default="true" />
-    <arg name="load_screwdriver" default="true" />
+    <arg name="load_head_cam" default="false" />
+    <arg name="load_screwdriver" default="false" />
     <!-- Gazebo -->
     <arg name="gazebo_gui" default="false"/>
 
@@ -27,40 +27,7 @@
     <arg name="launch_moveit" default="true"/>
 
     <arg name="spawn_ros_controllers" default="joint_state_controller cart_opt_controller"/>
-    
-    <rosparam>
-      # Joint state publisher
-      joint_state_controller:
-        type: joint_state_controller/JointStateController
-        publish_rate: 50
-
-      # Joint trajectory controller
-      cart_opt_controller:
-        type: cart_opt_controllers/JointTrajectoryController
-        joints: 
-          - joint_0
-          - joint_1
-          - joint_2
-          - joint_3
-          - joint_4
-          - joint_5
-          - joint_6
-        cartesian_gains:
-          p_gains: [1000.0, 1000.0, 1000.0, 300.0, 300.0, 300.0]
-          d_gains: [50.0, 50.0, 50.0, 10.0, 10.0, 10.0]
-        regularisation_weights:
-          joints: 1.0e-03
-          tau: 1.0e-05
-        joint_gains:
-          p_gains: [450.0, 450.0, 80.0, 450.0, 80.0, 20.0, 1.0]
-          d_gains: [20.0, 20.0, 1.5, 20.0, 1.5, 1.0, 0.05]
-        constraints:
-          goal_time: 0.6
-          stopped_velocity_tolerance: 0.02
-          # joint_0: {trajectory: 3.6, goal: 3.6} #trajectory does not have to be followed
-        stop_trajectory_duration: 0.5
-        state_publish_rate:  25
-    </rosparam>
+    <rosparam command="load" file="$(find cart_opt_ctrl)/config/controller_params.yaml"/>
 
 <!--============ LWR Runner script ===============-->
 

@@ -5,6 +5,7 @@
 #include <rtt_ros_kdl_tools/chain_utils.hpp>
 #include <eigen_conversions/eigen_kdl.h>
 #include <qpOASES.hpp>
+#include <boost/graph/graph_concepts.hpp>
 
 // New interface for cart_opt controller
 namespace hardware_interface
@@ -47,8 +48,77 @@ class HardwareInterfaceAdapter<hardware_interface::CartOptEffortJointInterface, 
 public:
   HardwareInterfaceAdapter() : joint_handles_ptr_(0) {}
   
+  
+  void update_gains(){
+    // Read params
+    XmlRpc::XmlRpcValue xml_array;
+    if(nh_controller_.hasParam("cartesian_gains/p_gains")){
+      if(nh_controller_.getParam("cartesian_gains/p_gains", xml_array)){ 
+        if (xml_array.getType() != XmlRpc::XmlRpcValue::TypeArray)
+          ROS_ERROR_STREAM("The cartesian_gains/p_gains parameter is not an array (namespace: " <<nh_controller_.getNamespace() << ").");
+        else{
+          if(xml_array.size()!=6){
+            ROS_ERROR_STREAM("The array joint_gains/p_gains parameter does not have the right size, 6");
+          }else{
+            for(unsigned int i=0; i<6; ++i)
+              P_gain(i) = static_cast<double>(xml_array[i]);
+          }
+        }
+      }
+    }
+    if (nh_controller_.hasParam("cartesian_gains/d_gains")){
+      if(nh_controller_.getParam("cartesian_gains/d_gains", xml_array)){ 
+        if (xml_array.getType() != XmlRpc::XmlRpcValue::TypeArray)
+          ROS_ERROR_STREAM("The cartesian_gains/d_gains parameter is not an array (namespace: " <<nh_controller_.getNamespace() << ").");
+        else{
+          if(xml_array.size()!=6){
+            ROS_ERROR_STREAM("The array joint_gains/p_gains parameter does not have the right size, 6");
+          }else{
+            for(unsigned int i=0; i<6; ++i)
+              D_gain(i) = static_cast<double>(xml_array[i]);
+          }
+        }
+      }
+    }
+    if(nh_controller_.hasParam("joint_gains/p_gains")){
+      if(nh_controller_.getParam("joint_gains/p_gains", xml_array)){ 
+        if (xml_array.getType() != XmlRpc::XmlRpcValue::TypeArray)
+          ROS_ERROR_STREAM("The joint_gains/p_gains parameter is not an array (namespace: " <<nh_controller_.getNamespace() << ").");
+        else{
+          if(xml_array.size()!=arm.getNrOfJoints()){
+            ROS_ERROR_STREAM("The array joint_gains/p_gains parameter does not have the right size, "<<arm.getNrOfJoints());
+          }else{
+            for(unsigned int i=0; i<arm.getNrOfJoints(); ++i)
+              P_joint_gain(i) = static_cast<double>(xml_array[i]);
+          }
+        }
+      }
+    }
+    if (nh_controller_.hasParam("joint_gains/d_gains")){
+      if(nh_controller_.getParam("joint_gains/d_gains", xml_array)){ 
+        if (xml_array.getType() != XmlRpc::XmlRpcValue::TypeArray)
+          ROS_ERROR_STREAM("The joint_gains/d_gains parameter is not an array (namespace: " <<nh_controller_.getNamespace() << ").");
+        else{
+          if(xml_array.size()!=arm.getNrOfJoints()){
+            ROS_ERROR_STREAM("The array joint_gains/p_gains parameter does not have the right size, "<<arm.getNrOfJoints());
+          }
+          else{
+            for(unsigned int i=0; i<arm.getNrOfJoints(); ++i)
+              D_joint_gain(i) = static_cast<double>(xml_array[i]);
+          }
+        }
+      }
+    }
+    if (nh_controller_.hasParam("regularisation_weights/joints"))
+      nh_controller_.getParam("regularisation_weights/joints", Alpha);
+    if (nh_controller_.hasParam("regularisation_weights/tau"))
+      nh_controller_.getParam("regularisation_weights/tau", Regularisation);
+  }
+  
   bool init(std::vector<hardware_interface::JointHandle>& joint_handles, ros::NodeHandle& controller_nh)
   {
+    nh_controller_ = controller_nh;
+    
     // Store pointer to joint handles
     joint_handles_ptr_ = &joint_handles;
 
@@ -197,6 +267,9 @@ public:
   {
     const unsigned int n_joints = joint_handles_ptr_->size();
 
+    // Update current gains with params
+    update_gains();
+    
     // Preconditions
     if (!joint_handles_ptr_) {return;}
     assert(n_joints == state_error.position.size());
@@ -405,6 +478,8 @@ public:
 
 private:
   std::vector<hardware_interface::JointHandle>* joint_handles_ptr_;
+  
+  ros::NodeHandle nh_controller_;
   
   // CHain chain_utils
   rtt_ros_kdl_tools::ChainUtils arm;
