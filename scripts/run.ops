@@ -6,7 +6,4 @@ runScript(ros.find("lwr_utils")+"/scripts/utils.ops")
 loadRobot(getRobotName(),isSim(),true)
 loadStatePublisher(true)
 loadROSControl(true)
-
-// Set initial robot configuration
-setRobotInitialJointConfiguration(0.0,0.0,0.0,0.0,0.0,0.0,0.0)
 setJointTorqueControlMode()
