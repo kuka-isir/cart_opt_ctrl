@@ -7,6 +7,11 @@
 #include <qpOASES.hpp>
 #include <boost/graph/graph_concepts.hpp>
 
+# define M_PI 3.14159265358979323846  /* pi */
+
+#include <geometry_msgs/Pose.h>
+#include <kdl_conversions/kdl_msg.h>
+
 // New interface for cart_opt controller
 namespace hardware_interface
 {
@@ -151,8 +156,8 @@ public:
     joint_velocity_in.setZero(dof);
     
     // Default gains, works but stiff
-    P_gain << 1000, 1000, 1000, 300, 300, 300;
-    D_gain << 50, 50, 50, 10, 10, 10;
+    P_gain << 800, 800, 800, 350, 350, 350;
+    D_gain << 22, 22, 22, 10, 10, 10;
     P_joint_gain << 450.0, 450.0, 80.0, 450.0, 80.0, 20.0, 1.0;
     D_joint_gain << 20.0, 20.0, 1.5, 20.0, 1.5, 1.0, 0.05;
     
@@ -240,6 +245,10 @@ public:
      // Instantiate other solvers
     this->fk_solver_vel_.reset(new KDL::ChainFkSolverVel_recursive(arm.Chain()));
     this->jntToJacDotSolver_.reset(new KDL::ChainJntToJacDotSolver(arm.Chain()));
+    
+    xdes_pub_ = controller_nh.advertise<geometry_msgs::Pose>("/cart_opt/desired", 1);
+    xcurr_pub_ = controller_nh.advertise<geometry_msgs::Pose>("/cart_opt/current", 1);
+    xerr_pub_ = controller_nh.advertise<geometry_msgs::Twist>("/cart_opt/error", 1);
     
     return true;
   }
@@ -337,14 +346,40 @@ public:
     // Compute cartesian errors
     X_err = diff( X_curr , X_traj );
     Xd_err = diff( Xd_curr , Xd_traj);
-  
+    
+    // Saturate the position and integral errors
+    for(unsigned int i=0; i<3; ++i )
+    {
+      if(X_err(i) >0)
+        X_err(i) = std::min(0.01, X_err(i));
+      else
+        X_err(i) = std::max(-0.01, X_err(i));
+    }
+    for(unsigned int i=3; i<6; ++i )
+    {
+      if(X_err(i) >0)
+        X_err(i) = std::min(M_PI/100, X_err(i));
+      else
+        X_err(i) = std::max(-M_PI/100, X_err(i));
+    }    
+//  X_err(i) = std::min(0.01, std::abs(X_err(i))) * X_err(i) / std::abs(X_err(i)) ;
+    
+    // Saturate joint position error
+    State error_saturate = state_error;
+    for(unsigned int i=0; i<n_joints; ++i){
+      if(error_saturate.position[i] >0)
+        error_saturate.position[i] = std::min(0.01, error_saturate.position[i]);
+      else
+        error_saturate.position[i] = std::max(-0.01, error_saturate.position[i]);
+    }
+    
     // Apply PD 
     for(unsigned int i=0; i<6; ++i )
     {
       Xdd_des(i) = Xdd_traj(i) +P_gain(i) * X_err(i) + D_gain(i) * Xd_err(i);
     }
     for(unsigned int i=0; i<n_joints; ++i){
-      qdd_des(i) = qdd_traj(i) + P_joint_gain(i) * state_error.position[i] + D_joint_gain(i) * state_error.velocity[i];
+      qdd_des(i) = qdd_traj(i) + P_joint_gain(i) * error_saturate.position[i] + D_joint_gain(i) * error_saturate.velocity[i];
     }    
     
     Eigen::Matrix<double,6,1> xdd_des;
@@ -474,6 +509,17 @@ public:
     {    
       (*joint_handles_ptr_)[i].setCommand(joint_torque_out(i));
     }
+    
+    // Debug publish in ROS
+    geometry_msgs::Pose xdes, xcurr;
+    geometry_msgs::Twist xerr;    
+    tf::poseKDLToMsg(X_traj,xdes);
+    tf::poseKDLToMsg(X_curr,xcurr);
+    tf::twistKDLToMsg(X_err, xerr);
+    xdes_pub_.publish(xdes);
+    xcurr_pub_.publish(xcurr);
+    xerr_pub_.publish(xerr);
+    
   }
 
 private:
@@ -506,6 +552,10 @@ private:
   boost::scoped_ptr<KDL::ChainFkSolverVel_recursive> fk_solver_vel_;
   boost::scoped_ptr<KDL::ChainJntToJacDotSolver> jntToJacDotSolver_;
   std::unique_ptr<qpOASES::SQProblem> qpoases_solver;
+  
+  // Publishers for debug
+  ros::Publisher xdes_pub_, xcurr_pub_, xerr_pub_;
+  
 };
 
 #endif // header guard
