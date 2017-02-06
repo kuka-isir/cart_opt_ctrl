@@ -22,7 +22,13 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
     this->addProperty("FrameOfInterest",this->ee_frame).doc("The robot frame to track the trajectory");
     this->addProperty("P_gain",this->P_gain).doc("Proportional gain");
     this->addProperty("D_gain",this->D_gain).doc("Derivative gain");
-    this->addProperty("Regularisation",this->Regularisation).doc("weight for the regularisation in QP");
+    this->addProperty("Position_Saturation",this->Position_Saturation).doc("Position saturation");
+    this->addProperty("Orientation_Saturation",this->Orientation_Saturation).doc("Orientation saturation");
+    this->addProperty("Regularisation_Weight",this->Regularisation_Weight).doc("Weight for the regularisation in QP");
+    this->addProperty("Compensate_Gravity",this->Compensate_Gravity).doc("Do we need to compensate gravity ?");
+    this->addProperty("Damping_Weight",this->Damping_Weight).doc("Weight for the damping in regularisation");
+    this->addProperty("Torque_Max",this->Torque_Max).doc("Max torque for each joint");
+    this->addProperty("Joint_Velocity_Max",this->Joint_Velocity_Max).doc("Max velocity for each joint");
 }
 
 bool CartOptCtrl::configureHook()
@@ -39,23 +45,27 @@ bool CartOptCtrl::configureHook()
     // Not using Matrix<double,6,1> because of ops script limitations
     this->P_gain.resize(6);
     this->D_gain.resize(6);
+    this->Torque_Max.resize(dof);
+    this->Joint_Velocity_Max.resize(dof);
     
-    // Let's use the last segment to track by default
+    // Default params
     this->ee_frame = arm.getSegmentName( arm.getNrOfSegments() - 1 );
-    
-    // Default gains, works but stiff
     this->P_gain << 1000,1000,1000,1000,1000,1000;
     this->D_gain << 22,22,22,22,22,22;
-    
-    // Default regularisation task weight
-    this->Regularisation = 1e-05;
+    this->Position_Saturation = 0.01;
+    this->Orientation_Saturation = M_PI/100;
+    this->Regularisation_Weight = 1e-05;
+    this->Compensate_Gravity = true;
+    this->Damping_Weight = 1.0;
+    // TODO: get this from URDF
+    this->Torque_Max << 175,175,99,99,99,37,37 ;
+    this->Joint_Velocity_Max << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
     
     // Match all properties (defined in the constructor) 
     // with the rosparams in the namespace : 
     // nameOfThisComponent/nameOftheProperty
     // Equivalent to ros::param::get("CartOptCtrl/P_gain");
     rtt_ros_kdl_tools::getAllPropertiesFromROSParam(this);
-    
     
     // For now we have 0 constraints for now
     int number_of_variables = dof;
@@ -78,6 +88,7 @@ bool CartOptCtrl::configureHook()
     this->qpoases_solver->setOptions( options );
     this->qpoases_solver->setPrintLevel(qpOASES::PL_NONE); // PL_HIGH for full output, PL_NONE for... none
     
+    // Initialize start values
     button_pressed = false;
     transition_gain = 1.0;
     
@@ -168,16 +179,16 @@ void CartOptCtrl::updateHook()
     for(unsigned int i=0; i<3; ++i )
     {
       if(X_err(i) >0)
-        X_err(i) = std::min(0.01, X_err(i));
+        X_err(i) = std::min(Position_Saturation, X_err(i));
       else
-        X_err(i) = std::max(-0.01, X_err(i));
+        X_err(i) = std::max(-Position_Saturation, X_err(i));
     }
     for(unsigned int i=3; i<6; ++i )
     {
       if(X_err(i) >0)
-        X_err(i) = std::min(M_PI/100, X_err(i));
+        X_err(i) = std::min(Orientation_Saturation, X_err(i));
       else
-        X_err(i) = std::max(-M_PI/100, X_err(i));
+        X_err(i) = std::max(-Orientation_Saturation, X_err(i));
     }    
     
     // Apply PD 
@@ -220,8 +231,6 @@ void CartOptCtrl::updateHook()
     decoupling_orientation.resize(6,6);
     decoupling_position.setIdentity();
     decoupling_orientation.setIdentity();
-//     decoupling_position.setIdentity();
-//     decoupling_orientation.setZero();
     decoupling_position(3,3)=0;
     decoupling_position(4,4)=0;
     decoupling_position(5,5)=0;
@@ -235,7 +244,7 @@ void CartOptCtrl::updateHook()
     if (button_pressed)
       transition_gain = 0.0;
     else
-      transition_gain = std::min(1.0,transition_gain + 0.1 * Regularisation);
+      transition_gain = std::min(1.0,transition_gain + 0.1 * Regularisation_Weight);
     decoupling_position *= transition_gain;
     decoupling_orientation *= transition_gain;
         
@@ -259,33 +268,24 @@ void CartOptCtrl::updateHook()
     Eigen::MatrixXd regularisation;
     regularisation.resize( arm.getNrOfJoints(), arm.getNrOfJoints() );
     regularisation.setIdentity();
-    regularisation *= this->Regularisation;
+    regularisation *= this->Regularisation_Weight;
     
     Eigen::MatrixXd damping_regularisation;
     damping_regularisation.resize( arm.getNrOfJoints(), arm.getNrOfJoints() );
     damping_regularisation.setIdentity();
-    damping_regularisation *= 3.0;
+    damping_regularisation *= Damping_Weight;
     
     H = 2.0 * a.transpose() * a + 2.0 * ao.transpose() * ao + 2.0* regularisation;
-    g = 2.0 * a.transpose() * b +  2.0 * ao.transpose()* bo - 2.0* (regularisation * (gravity.data - damping_regularisation* joint_velocity_in));
-    
-    // TODO: get this from URDF
-    Eigen::VectorXd torque_max;
-    torque_max.resize(arm.getNrOfJoints());
-    torque_max << 175,175,99,99,99,37,37; // N.m
-
-    Eigen::VectorXd torque_min;
-    torque_min.resize(arm.getNrOfJoints());
-    torque_min = -torque_max; // N.m
+    if (Compensate_Gravity)
+      g = 2.0 * a.transpose() * b +  2.0 * ao.transpose()* bo - 2.0* (regularisation * (gravity.data - damping_regularisation* joint_velocity_in));
+    else
+      g = 2.0 * a.transpose() * b +  2.0 * ao.transpose()* bo;
     
     // Compute bounds
     Eigen::VectorXd lb(arm.getNrOfJoints()),
                     ub(arm.getNrOfJoints());
-    
-    //TODO : write constraints for q and qdot
-    lb = torque_min;
-    ub = torque_max;
-    
+    lb = -Torque_Max;
+    ub = Torque_Max;    
     
     // Update Constraints
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(arm.getNrOfJoints(),arm.getNrOfJoints());
@@ -294,8 +294,8 @@ void CartOptCtrl::updateHook()
                     qd_min(arm.getNrOfJoints()),
                     qd_max(arm.getNrOfJoints());
     
-    qd_min.setConstant(-1.0);
-    qd_max.setConstant(1.0);
+    qd_max = Joint_Velocity_Max;
+    qd_min = -Joint_Velocity_Max;
     
     A = arm.getInertiaInverseMatrix().data;
     

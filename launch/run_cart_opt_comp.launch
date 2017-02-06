@@ -42,10 +42,16 @@
 
     <!-- The parameters that the CartOptCtrl sensor will get -->
     <rosparam ns="CartOptCtrl" subst_value="true">
-        P_gain : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
-        D_gain : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
-        
-        Regularisation : 0.00001
+      Torque_Max : [175.0, 175.0, 99.0, 99.0, 99.0, 37.0, 37.0]
+      Joint_Velocity_Max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      P_gain : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
+      D_gain : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
+      Position_Saturation : 0.01
+      Orientation_Saturation : 0.0314
+      Regularisation_Weight : 0.00001
+      Compensate_Gravity : true
+      Damping_Weight : 1
+      FrameOfInterest : "ati_link"
     </rosparam>
 
 <!--============ LWR Runner script ===============-->
