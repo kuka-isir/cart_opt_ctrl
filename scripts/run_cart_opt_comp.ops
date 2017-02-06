@@ -5,37 +5,41 @@ runScript(ros.find("lwr_utils")+"/scripts/utils.ops")
 // Load robot
 loadRobot(getRobotName(),isSim(),true)
 loadStatePublisher(true)
-loadROSControl(true)
 
 // Set initial robot configuration
-setRobotInitialJointConfiguration(0.0,0.0,0.0,0.0,0.0,0.0,0.0)
+if (isSim()) then
+  setRobotInitialJointConfiguration(1.0,0.,0.0,-1.57,0.0,1.57,0.)
 setJointTorqueControlMode()
 
-// Load interpolator component
-ros.import("cart_opt_ctrl")
-loadComponent("CartTrajInterp","CartTrajInterp")
-setActivity("CartTrajInterp",0.001,HighestPriority-3,ORO_SCHED_RT)
-
-// Connect interpolator
-connectPeers("CartTrajInterp",getRobotName())
-connectStandardPorts("CartTrajInterp",getRobotName(),ConnPolicy())
-stream("CartTrajInterp.TrajectoryIn",ros.comm.topic("move_group/result"))
-
-// Configure & start interpolator
-configureComponent("CartTrajInterp")
-startComponent("CartTrajInterp")
+import("rtt_ros")
 
 // Load controller component
+ros.import("cart_opt_ctrl")
+loadComponent("KDLTrajCompute","KDLTrajCompute")
+setActivity("KDLTrajCompute",0.001,HighestPriority,ORO_SCHED_RT)
+stream("KDLTrajCompute.StartPoseIn",ros.comm.topic("KDLTrajGen/compute_trajectory"))
+stream("KDLTrajCompute.PathROSOut",ros.comm.topic("KDLTrajGen/path"))
+stream("KDLTrajCompute.PathPosesROSOut",ros.comm.topic("KDLTrajGen/pose_array"))
+
 loadComponent("CartOptCtrl","CartOptCtrl")
-setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
+// setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
+setActivity("CartOptCtrl",0.001,LowestPriority,ORO_SCHED_RT)
 
 // Connect controller
 connectPeers("CartOptCtrl",getRobotName())
 connectStandardPorts("CartOptCtrl",getRobotName(),ConnPolicy())
+connectPeers("CartOptCtrl","KDLTrajCompute")
+connect("KDLTrajCompute.TrajectoryPointPosOut","CartOptCtrl.TrajectoryPointPosIn",ConnPolicy())
+connect("KDLTrajCompute.TrajectoryPointVelOut","CartOptCtrl.TrajectoryPointVelIn",ConnPolicy())
+connect("KDLTrajCompute.TrajectoryPointAccOut","CartOptCtrl.TrajectoryPointAccIn",ConnPolicy())
 stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
-connectPeers("CartTrajInterp","CartOptCtrl")
-connect("CartTrajInterp.TrajectoryPointOut","CartOptCtrl.TrajectoryPointIn", ConnPolicy())
-connect("CartTrajInterp.TrajectoryJointOut","CartOptCtrl.TrajectoryJointIn", ConnPolicy())
+stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
+stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
+stream("CartOptCtrl.ButtonPressed",ros.comm.topic("activate_gravity"))
+
+// Configure & start trajectory sender
+configureComponent("KDLTrajCompute")
+startComponent("KDLTrajCompute")
 
 // Configure & start controller
 configureComponent("CartOptCtrl")

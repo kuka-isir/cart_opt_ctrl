@@ -27,7 +27,7 @@
     <!-- Run in GDB -->
     <arg name="debug" default="false" />
     <!-- Launch rviz -->
-    <arg name="rviz" default="true" />
+    <arg name="rviz" default="false" />
     <!-- The level of verbose (never, fatal, critical, error, warning, info, debug, realtime) -->
     <arg name="log_level" default="error" />
     <!-- Tools -->
@@ -37,26 +37,14 @@
     <arg name="load_handle" default="true" />
     <!-- Gazebo -->
     <arg name="gazebo_gui" default="false"/>
-    <!-- MoveIt! -->
-    <arg name="launch_moveit" default="true"/>
-    <arg name="moveit_rviz" default="true"/>
-    
-    <arg name="spawn_ros_controllers" default="joint_state_controller"/>
     
 <!--============ CartOptCtrl Params ============-->
-    
-    <!-- The parameters for the CartTrajInterp component -->
-    <rosparam ns="CartTrajInterp" subst_value="true">
-        SampleDuration : 0.001
-    </rosparam>
 
     <!-- The parameters that the CartOptCtrl sensor will get -->
     <rosparam ns="CartOptCtrl" subst_value="true">
-        P_gain : [100,100,100,30,30,30]
-        D_gain : [10,10,10,2,2,2]
-        P_joint_gain : [450.0, 450.0, 80.0, 450.0, 80.0, 20.0, 1.0]
-        D_joint_gain : [20.0, 20.0, 1.5, 20.0, 1.5, 1.0, 0.05]
-        Alpha : 0.001
+        P_gain : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
+        D_gain : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
+        
         Regularisation : 0.00001
     </rosparam>
 
@@ -76,12 +64,5 @@
         <arg name="load_handle" value="$(arg load_handle)" />
         <arg name="gazebo_gui" value="$(arg gazebo_gui)"/>
     </include>
-    
-    <include file="$(find lwr_moveit_config)/launch/lwr.launch" if="$(arg launch_moveit)">
-        <arg name="moveit_rviz" value="$(arg moveit_rviz)"/>
-    </include>
-    
-    <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
-        output="screen" args="$(arg spawn_ros_controllers)"/>
 
 </launch>
