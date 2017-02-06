@@ -52,7 +52,7 @@ void KDLTrajCompute::updateHook()
       port_pnt_acc_out_.write(current_acc_);
       
       // Increase timer
-      current_traj_time_ += 0.001;
+      current_traj_time_ += this->getPeriod();
       
       // Set booleans
       new_trajectory_call_ = false;
