@@ -68,12 +68,12 @@ protected:
     KDL::Twist Xd_curr,Xdd_curr,Xd_traj,Xdd_traj;
     KDL::Twist Xdd_des;
     
-    double Regularisation_Weight;
+    Eigen::VectorXd Regularisation_Weight, Damping_Weight;
     double transition_gain;
     double Position_Saturation, Orientation_Saturation;
-    double Damping_Weight;
     bool Compensate_Gravity;
     Eigen::VectorXd P_gain, D_gain, Torque_Max, Joint_Velocity_Max;
+    std::vector<Eigen::VectorXd> SelectComponent, SelectAxis;
 
     std::unique_ptr<qpOASES::SQProblem> qpoases_solver;
 };

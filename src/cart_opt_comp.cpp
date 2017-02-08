@@ -29,6 +29,16 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
     this->addProperty("Damping_Weight",this->Damping_Weight).doc("Weight for the damping in regularisation");
     this->addProperty("Torque_Max",this->Torque_Max).doc("Max torque for each joint");
     this->addProperty("Joint_Velocity_Max",this->Joint_Velocity_Max).doc("Max velocity for each joint");
+    
+    this->SelectComponent.resize(6);
+    this->SelectAxis.resize(SelectComponent.size());
+    for(int i = 0; i<SelectComponent.size() ; i++){
+      std::string name = "SelectComponent"+ std::to_string(i);
+      this->addProperty(name,this->SelectComponent[i]).doc("Selection of cartesian components for the task");
+      name = "SelectAxis"+ std::to_string(i);
+      this->addProperty(name,this->SelectAxis[i]).doc("Selection of the axis to use for the task");
+    }
+    
 }
 
 bool CartOptCtrl::configureHook()
@@ -47,6 +57,12 @@ bool CartOptCtrl::configureHook()
     this->D_gain.resize(6);
     this->Torque_Max.resize(dof);
     this->Joint_Velocity_Max.resize(dof);
+    this->Regularisation_Weight.resize(dof);
+    this->Damping_Weight.resize(dof);
+    for(int i = 0; i<SelectComponent.size() ; i++){
+      this->SelectComponent[i].resize(6);
+      this->SelectAxis[i].resize(dof);
+    }
     
     // Default params
     this->ee_frame = arm.getSegmentName( arm.getNrOfSegments() - 1 );
@@ -54,9 +70,15 @@ bool CartOptCtrl::configureHook()
     this->D_gain << 22,22,22,22,22,22;
     this->Position_Saturation = 0.01;
     this->Orientation_Saturation = M_PI/100;
-    this->Regularisation_Weight = 1e-05;
+    this->Regularisation_Weight << 1e-05,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05;
+    this->Damping_Weight  << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
     this->Compensate_Gravity = true;
-    this->Damping_Weight = 1.0;
+    for(int i = 1; i<SelectComponent.size() ; i++){
+      this->SelectComponent[i].setZero(6);
+      this->SelectAxis[i].setZero(dof);
+    }
+    this->SelectComponent[1].setOnes(6);
+    this->SelectAxis[1].setOnes(dof);
     // TODO: get this from URDF
     this->Torque_Max << 175,175,99,99,99,37,37 ;
     this->Joint_Velocity_Max << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
@@ -225,18 +247,20 @@ void CartOptCtrl::updateHook()
     // If with replace, we can put it in the form ax + b
     // With a = 00001J.Minv
     //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
+  
+    Eigen::MatrixXd regularisation = this->Regularisation_Weight.asDiagonal();
+    Eigen::MatrixXd damping = this->Regularisation_Weight.asDiagonal();
     
-    Eigen::MatrixXd decoupling_position, decoupling_orientation;
-    decoupling_position.resize(6,6);
-    decoupling_orientation.resize(6,6);
-    decoupling_position.setIdentity();
-    decoupling_orientation.setIdentity();
-    decoupling_position(3,3)=0;
-    decoupling_position(4,4)=0;
-    decoupling_position(5,5)=0;
-    decoupling_orientation(0,0)=0;
-    decoupling_orientation(1,1)=0;
-    decoupling_orientation(2,2)=0;
+    // Matrices for qpOASES
+    // NOTE: We need RowMajor (see qpoases doc)
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> H;
+    H.resize(arm.getNrOfJoints(),arm.getNrOfJoints());  
+    H = 2.0 * regularisation;
+    
+    Eigen::VectorXd g(arm.getNrOfJoints());
+    
+    if (Compensate_Gravity)
+      g = - 2.0* (regularisation * (gravity.data - damping* joint_velocity_in));
     
     if(this->port_button_pressed_in.read(this->button_pressed_msg) != RTT::NoData){
       button_pressed = button_pressed_msg.data;
@@ -244,42 +268,23 @@ void CartOptCtrl::updateHook()
     if (button_pressed)
       transition_gain = 0.0;
     else
-      transition_gain = std::min(1.0,transition_gain + 0.1 * Regularisation_Weight);
-    decoupling_position *= transition_gain;
-    decoupling_orientation *= transition_gain;
-        
-    Eigen::Matrix<double,6,Eigen::Dynamic> a, ao;
+      transition_gain = std::min(1.0,transition_gain + 1e-06);
+    
+    Eigen::Matrix<double,6,Eigen::Dynamic> a;
     a.resize(6,arm.getNrOfJoints());
-    ao.resize(6,arm.getNrOfJoints());
-    a.noalias() = decoupling_position* J.data * M_inv.data;
-    ao.noalias() = decoupling_orientation* J.data * M_inv.data;
+    Eigen::Matrix<double,6,1> b;
     
-    Eigen::Matrix<double,6,1> b, bo;
-    b.noalias() = - a * ( coriolis.data + gravity.data ) + decoupling_position* jdot_qdot - decoupling_position *xdd_des;
-    bo.noalias() = - ao * ( coriolis.data + gravity.data ) + decoupling_orientation* jdot_qdot - decoupling_orientation *xdd_des;
-    
-    // Matrices for qpOASES
-    // NOTE: We need RowMajor (see qpoases doc)
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> H;
-    H.resize(arm.getNrOfJoints(),arm.getNrOfJoints());
-    
-    Eigen::VectorXd g(arm.getNrOfJoints());
-    
-    Eigen::MatrixXd regularisation;
-    regularisation.resize( arm.getNrOfJoints(), arm.getNrOfJoints() );
-    regularisation.setIdentity();
-    regularisation *= this->Regularisation_Weight;
-    
-    Eigen::MatrixXd damping_regularisation;
-    damping_regularisation.resize( arm.getNrOfJoints(), arm.getNrOfJoints() );
-    damping_regularisation.setIdentity();
-    damping_regularisation *= Damping_Weight;
-    
-    H = 2.0 * a.transpose() * a + 2.0 * ao.transpose() * ao + 2.0* regularisation;
-    if (Compensate_Gravity)
-      g = 2.0 * a.transpose() * b +  2.0 * ao.transpose()* bo - 2.0* (regularisation * (gravity.data - damping_regularisation* joint_velocity_in));
-    else
-      g = 2.0 * a.transpose() * b +  2.0 * ao.transpose()* bo;
+    for(int i=0; i<this->SelectComponent.size();i++){
+      Eigen::MatrixXd select_axis = SelectAxis[i].asDiagonal();
+      Eigen::MatrixXd select_cartesian_component = SelectComponent[i].asDiagonal();
+      select_cartesian_component *= transition_gain;
+      
+      a.noalias() =  J.data * select_axis * M_inv.data;
+      b.noalias() = (- a * ( coriolis.data + gravity.data ) + jdot_qdot - xdd_des);
+      
+      H += 2.0 * a.transpose() * select_cartesian_component * a;  
+      g += 2.0 * a.transpose() * select_cartesian_component * b;
+    }
     
     // Compute bounds
     Eigen::VectorXd lb(arm.getNrOfJoints()),
