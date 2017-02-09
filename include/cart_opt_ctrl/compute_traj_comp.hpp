@@ -18,9 +18,11 @@
 #include <kdl/rotational_interpolation_sa.hpp>
 #include <kdl/trajectory_stationary.hpp>
 #include <kdl/trajectory_segment.hpp>
+#include <kdl/utilities/error.h>
 
 #include <tf_conversions/tf_kdl.h>
 #include <nav_msgs/Path.h>
+#include <cart_opt_ctrl/UpdateWaypoints.h>
 
 class KDLTrajCompute : public RTT::TaskContext
 {
@@ -33,22 +35,21 @@ public:
   void updateHook();
   void stopHook();
   void publishTrajectory();
-  void computeTrajectory();
+  bool computeTrajectory();
+  bool updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& req, cart_opt_ctrl::UpdateWaypoints::Response& resp);
 protected:
-  // Input ports
-  RTT::InputPort<geometry_msgs::Pose> port_start_pose_in_;
   // Output ports
   RTT::OutputPort<KDL::Frame> port_pnt_pos_out_;
   RTT::OutputPort<KDL::Twist> port_pnt_vel_out_, port_pnt_acc_out_;
   RTT::OutputPort<nav_msgs::Path> port_path_out_;
   RTT::OutputPort<geometry_msgs::PoseArray> port_pose_array_out_;
   
-  geometry_msgs::Pose start_pose_in_;
+  geometry_msgs::PoseArray waypoints_in_;
   KDL::Frame current_pos_;
   KDL::Twist current_vel_, current_acc_;
   
   double current_traj_time_;
-  bool new_trajectory_call_, traj_computed_, traj_finished_;
+  bool traj_computed_;
     
   KDL::Frame frame_des_kdl;
   KDL::FrameVel frame_vel_des_kdl;

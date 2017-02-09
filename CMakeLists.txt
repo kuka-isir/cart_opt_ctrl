@@ -19,6 +19,8 @@ find_package(catkin REQUIRED COMPONENTS
     control_msgs
     trajectory_msgs
     controller_manager
+    message_generation
+    geometry_msgs
 )
 
 
@@ -31,6 +33,20 @@ include_directories(
     ${Eigen_INCLUDE_DIRS}
     ${orocos_kdl_INCLUDE_DIRS}
     ${USE_OROCOS_INCLUDE_DIRS}
+)
+
+add_service_files(
+  FILES
+  UpdateWaypoints.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs
+)
+
+catkin_package(
+  CATKIN_DEPENDS message_runtime
 )
 
 ## ROS control and trajectory nodes

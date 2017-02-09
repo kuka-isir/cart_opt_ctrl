@@ -48,14 +48,14 @@
       D_gain : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
       Position_Saturation : 0.01
       Orientation_Saturation : 0.0314
-      Regularisation_Weight : [0.00001, 0.00001, 0.00001, 0.00001, 0.00001, 0.00001, 1]
+      Regularisation_Weight : [0.00001, 0.00001,0.00001, 0.00001, 0.00001, 0.00001, 0.00001]
       Compensate_Gravity : true
       Damping_Weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
       FrameOfInterest : "ati_link"
-      SelectComponent0 : [1,1,1,0,0,0]
-      SelectAxis0 : [1,1,1,1,0,0,0]
-      SelectComponent1 : [0,0,0,1,1,0]
-      SelectAxis1 : [0,0,0,0,1,1,1]
+      SelectComponent0 : [1,1,1,1,1,1]
+      SelectAxis0 : [1,1,1,1,1,1,1]
+      SelectComponent1 : [0,0,0,0,0,0]
+      SelectAxis1 : [0,0,0,0,0,0,0]
       SelectComponent2 : [0,0,0,0,0,0]
       SelectAxis2 : [0,0,0,0,0,0,0]
       SelectComponent3 : [0,0,0,0,0,0]
