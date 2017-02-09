@@ -1,20 +1,27 @@
 #include "cart_opt_ctrl/compute_traj_comp.hpp"
 
-
 using namespace RTT;
 
-KDLTrajCompute::KDLTrajCompute(const std::string& name):RTT::TaskContext(name)
+KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
 { 
-  this->addPort("TrajectoryPointPosOut",this->port_pnt_pos_out_);
-  this->addPort("TrajectoryPointVelOut",this->port_pnt_vel_out_);
-  this->addPort("TrajectoryPointAccOut",this->port_pnt_acc_out_);
-  this->addPort("PathROSOut",this->port_path_out_);
-  this->addPort("PathPosesROSOut",this->port_pose_array_out_);
+  this->addPort("TrajectoryPointPosOut",port_pnt_pos_out_);
+  this->addPort("TrajectoryPointVelOut",port_pnt_vel_out_);
+  this->addPort("TrajectoryPointAccOut",port_pnt_acc_out_);
+  this->addPort("PathROSOut",port_path_out_);
+  this->addPort("PathPosesROSOut",port_pose_array_out_);
   this->addOperation("updateWaypoints",&KDLTrajCompute::updateWaypoints,this,RTT::OwnThread);
   
-  // TODO param this
-  double vmax = 0.1, accmax = 2.0;
-  vel_profile_ = new KDL::VelocityProfile_Trap(vmax,accmax);
+  this->addProperty("vel_max",vel_max_).doc("Max cartesian velocity");
+  this->addProperty("acc_max",acc_max_).doc("Max cartesian acceleration");
+  this->addProperty("radius",radius_).doc("Radius for path roundness");
+  this->addProperty("eqradius",eqradius_).doc("Equivalent radius for path roundness");
+  
+  // Default params
+  vel_max_ = 0.1;
+  acc_max_ = 2.0;
+  radius_ = 0.01;
+  eqradius_ = 0.05;
+  
   interpolator_ = new KDL::RotationalInterpolation_SingleAxis();
 }
 
@@ -30,20 +37,17 @@ bool KDLTrajCompute::updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& re
 }
 
 
-bool KDLTrajCompute::configureHook()
-{ 
+bool KDLTrajCompute::configureHook(){ 
   current_traj_time_ = 0.0;
   traj_computed_ = false;
   return true;
 }
 
-bool KDLTrajCompute::startHook()
-{ 
+bool KDLTrajCompute::startHook(){ 
   return true;
 }
 
-void KDLTrajCompute::updateHook()
-{ 
+void KDLTrajCompute::updateHook(){ 
   if (traj_computed_){
     if (current_traj_time_ < ctraject_->Duration()){
       // Get trajectory point
@@ -66,13 +70,10 @@ void KDLTrajCompute::updateHook()
   }
 }
 
-bool KDLTrajCompute::computeTrajectory(){
-  // TODO param this
-  double radius = 0.01, eqradius = 0.05;
-  
+bool KDLTrajCompute::computeTrajectory(){  
   try {
     // Initialize path with roundness between waypoints
-    path_ = new KDL::Path_RoundedComposite(radius,eqradius,interpolator_);
+    path_ = new KDL::Path_RoundedComposite(radius_,eqradius_,interpolator_);
 
     // Add all the waypoints to the path
     KDL::Frame frame;
@@ -83,6 +84,7 @@ bool KDLTrajCompute::computeTrajectory(){
     path_->Finish();
     
     // Set velocity profile of the trajectory
+    vel_profile_ = new KDL::VelocityProfile_Trap(vel_max_,acc_max_);
     vel_profile_->SetProfile(0,path_->PathLength());
     traject_ = new KDL::Trajectory_Segment(path_, vel_profile_);
 
@@ -130,6 +132,4 @@ void KDLTrajCompute::publishTrajectory(){
   port_pose_array_out_.write(pose_array);
 }
 
-void KDLTrajCompute::stopHook()
-{
-}
+void KDLTrajCompute::stopHook(){}

@@ -39,31 +39,37 @@
     <arg name="gazebo_gui" default="false"/>
     
 <!--============ CartOptCtrl Params ============-->
-
-    <!-- The parameters that the CartOptCtrl sensor will get -->
     <rosparam ns="CartOptCtrl" subst_value="true">
-      Torque_Max : [175.0, 175.0, 99.0, 99.0, 99.0, 37.0, 37.0]
-      Joint_Velocity_Max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-      P_gain : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
-      D_gain : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
-      Position_Saturation : 0.01
-      Orientation_Saturation : 0.0314
-      Regularisation_Weight : [0.00001, 0.00001,0.00001, 0.00001, 0.00001, 0.00001, 0.00001]
-      Compensate_Gravity : true
-      Damping_Weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-      FrameOfInterest : "ati_link"
-      SelectComponent0 : [1,1,1,1,1,1]
-      SelectAxis0 : [1,1,1,1,1,1,1]
-      SelectComponent1 : [0,0,0,0,0,0]
-      SelectAxis1 : [0,0,0,0,0,0,0]
-      SelectComponent2 : [0,0,0,0,0,0]
-      SelectAxis2 : [0,0,0,0,0,0,0]
-      SelectComponent3 : [0,0,0,0,0,0]
-      SelectAxis3 : [0,0,0,0,0,0,0]
-      SelectComponent4 : [0,0,0,0,0,0]
-      SelectAxis4 : [0,0,0,0,0,0,0]
-      SelectComponent5 : [0,0,0,0,0,0]
-      SelectAxis5 : [0,0,0,0,0,0,0]
+      torque_max : [175.0, 175.0, 99.0, 99.0, 99.0, 37.0, 37.0]
+      joint_vel_max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      p_gains : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
+      d_gains : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
+      position_saturation : 0.01
+      orientation_saturation : 0.0314
+      regularisation_weight : [0.00001, 0.00001,0.00001, 0.00001, 0.00001, 0.00001, 0.00001]
+      compensate_gravity : true
+      damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      frame_of_interest : "ati_link"
+      select_components_0 : [1,1,1,1,1,1]
+      select_axes_0 : [1,1,1,1,1,1,1]
+      select_components_1 : [0,0,0,0,0,0]
+      select_axes_1 : [0,0,0,0,0,0,0]
+      select_components_2 : [0,0,0,0,0,0]
+      select_axes_2 : [0,0,0,0,0,0,0]
+      select_components_3 : [0,0,0,0,0,0]
+      select_axes_3 : [0,0,0,0,0,0,0]
+      select_components_4 : [0,0,0,0,0,0]
+      select_axes_4 : [0,0,0,0,0,0,0]
+      select_components_5 : [0,0,0,0,0,0]
+      select_axes_5 : [0,0,0,0,0,0,0]
+    </rosparam>
+        
+<!--============ KDLTrajCompute Params ============-->
+    <rosparam ns="KDLTrajCompute" subst_value="true">
+      vel_max : 1.0
+      acc_max : 2.0
+      radius : 0.01
+      eqradius : 0.05
     </rosparam>
 
 <!--============ LWR Runner script ===============-->
