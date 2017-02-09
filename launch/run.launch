@@ -1,37 +1,36 @@
 <launch>
 <!--============ LWR Runner script Params ========-->
+  <!-- The end effector frame (you'll be able to use frames <= tip_link for cartesian position, jacobians etc.) -->
+  <arg name="tip_link" default="link_7"/>
+  <!-- Run Simulated robot (need to 'roslaunch rtt_lwr_gazebo lwr_gazebo.launch' first) -->
+  <arg name="sim" default="false" />
+  <!-- Run in GDB -->
+  <arg name="debug" default="false" />
+  <!-- Launch rviz -->
+  <arg name="rviz" default="false" />
+  <arg name="moveit_rviz" default="true"/>
+  <!-- The level of verbose (never, fatal, critical, error, warning, info, debug, realtime) -->
+  <arg name="log_level" default="warning" />
+  <!-- Tools -->
+  <arg name="load_base" default="true" />
+  <arg name="load_ati_sensor" default="true" />
+  <arg name="load_calib_tool" default="false" />
+  <arg name="load_table" default="true" />
+  <arg name="load_handle" default="true" />
+  <arg name="load_head_cam" default="false" />
+  <arg name="load_screwdriver" default="false" />
+  <!-- Gazebo -->
+  <arg name="gazebo_gui" default="false"/>
 
-    <!-- The end effector frame (you'll be able to use frames <= tip_link for cartesian position, jacobians etc.) -->
-    <arg name="tip_link" default="link_7"/>
-    <!-- Run Simulated robot (need to 'roslaunch rtt_lwr_gazebo lwr_gazebo.launch' first) -->
-    <arg name="sim" default="false" />
-    <!-- Run in GDB -->
-    <arg name="debug" default="false" />
-    <!-- Launch rviz -->
-    <arg name="rviz" default="false" />
-    <arg name="moveit_rviz" default="true"/>
-    <!-- The level of verbose (never, fatal, critical, error, warning, info, debug, realtime) -->
-    <arg name="log_level" default="warning" />
-    <!-- Tools -->
-    <arg name="load_base" default="true" />
-    <arg name="load_ati_sensor" default="true" />
-    <arg name="load_calib_tool" default="false" />
-    <arg name="load_table" default="true" />
-    <arg name="load_handle" default="true" />
-    <arg name="load_head_cam" default="false" />
-    <arg name="load_screwdriver" default="false" />
-    <!-- Gazebo -->
-    <arg name="gazebo_gui" default="false"/>
+  <!-- MoveIt! -->
+  <arg name="launch_moveit" default="true"/>
 
-    <!-- MoveIt! -->
-    <arg name="launch_moveit" default="true"/>
-
-    <arg name="spawn_ros_controllers" default="joint_state_controller cart_opt_controller"/>
-    <rosparam command="load" file="$(find cart_opt_ctrl)/config/controller_params.yaml"/>
+  <arg name="spawn_ros_controllers" default="joint_state_controller cart_opt_controller"/>
+  <rosparam command="load" file="$(find cart_opt_ctrl)/config/controller_params.yaml"/>
 
 <!--============ LWR Runner script ===============-->
 
-<include file="$(find lwr_utils)/launch/run.launch">
+  <include file="$(find lwr_utils)/launch/run.launch">
     <arg name="sim" value="$(arg sim)" />
     <arg name="ops_script" value="$(find cart_opt_ctrl)/scripts/run.ops"/>
     <arg name="debug" value="$(arg debug)" />
@@ -46,13 +45,13 @@
     <arg name="load_head_cam" value="$(arg load_head_cam)" />
     <arg name="load_screwdriver" value="$(arg load_screwdriver)" />
     <arg name="gazebo_gui" value="$(arg gazebo_gui)"/>
-</include>
+  </include>
 
-<include file="$(find lwr_moveit_config)/launch/lwr.launch" if="$(arg launch_moveit)">
-	<arg name="moveit_rviz" value="$(arg moveit_rviz)"/>
-</include>
+  <include file="$(find lwr_moveit_config)/launch/lwr.launch" if="$(arg launch_moveit)">
+    <arg name="moveit_rviz" value="$(arg moveit_rviz)"/>
+  </include>
 
-<node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
-    output="screen" args="$(arg spawn_ros_controllers)"/>
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+      output="screen" args="$(arg spawn_ros_controllers)"/>
 
 </launch>
