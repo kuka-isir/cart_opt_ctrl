@@ -1,0 +1,3 @@
+---
+geometry_msgs/Pose current_pose
+bool success

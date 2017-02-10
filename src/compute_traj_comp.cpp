@@ -9,7 +9,7 @@ KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
   this->addPort("TrajectoryPointAccOut",port_pnt_acc_out_);
   this->addPort("PathROSOut",port_path_out_);
   this->addPort("PathPosesROSOut",port_pose_array_out_);
-  this->addOperation("updateWaypoints",&KDLTrajCompute::updateWaypoints,this,RTT::OwnThread);
+  this->addOperation("updateWaypoints",&KDLTrajCompute::updateWaypoints,this,RTT::ClientThread);
   
   this->addProperty("vel_max",vel_max_).doc("Max cartesian velocity");
   this->addProperty("acc_max",acc_max_).doc("Max cartesian acceleration");
@@ -32,6 +32,10 @@ bool KDLTrajCompute::updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& re
   current_traj_time_ = 0.0;
   traj_computed_ = success;
   resp.success = success;
+  
+  while(traj_computed_){
+    usleep(1e05);
+  }
   
   return success;
 }

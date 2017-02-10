@@ -37,13 +37,22 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
     name = "select_axes_"+ std::to_string(i);
     this->addProperty(name,select_axes_[i]).doc("Selection of the axis to use for the task");
   }
+  
+  // Service to get current cartesian pose
+  this->addOperation("getCurrentPose",&CartOptCtrl::getCurrentPose,this,RTT::ClientThread);
+}
+
+bool CartOptCtrl::getCurrentPose(cart_opt_ctrl::GetCurrentPose::Request& req, cart_opt_ctrl::GetCurrentPose::Response& resp){
+  tf::poseKDLToMsg(X_curr_,resp.current_pose);
+  resp.success = true;
+  return true;
 }
 
 bool CartOptCtrl::configureHook(){
   // Initialise the model, the internal solvers etc
   if( ! arm_.init() ){
-      log(RTT::Error) << "Could not init chain utils !" << endlog();
-      return false;
+    log(RTT::Error) << "Could not init chain utils !" << endlog();
+    return false;
   }
   // The number of joints
   const int dof = arm_.getNrOfJoints();
@@ -370,4 +379,3 @@ void CartOptCtrl::updateHook(){
 void CartOptCtrl::stopHook(){
   has_first_command_ = false;
 }
-

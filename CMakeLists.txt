@@ -38,6 +38,7 @@ include_directories(
 add_service_files(
   FILES
   UpdateWaypoints.srv
+  GetCurrentPose.srv
 )
 
 generate_messages(

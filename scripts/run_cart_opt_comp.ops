@@ -25,6 +25,8 @@ stream("KDLTrajCompute.PathPosesROSOut",ros.comm.topic("KDLTrajGen/pose_array"))
 loadComponent("CartOptCtrl","CartOptCtrl")
 // setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
 setActivity("CartOptCtrl",0.001,LowestPriority,ORO_SCHED_RT)
+loadService("CartOptCtrl","rosservice")
+CartOptCtrl.rosservice.connect("getCurrentPose","/CartOptCtrl/getCurrentPose","cart_opt_ctrl/GetCurrentPose")
 
 // Connect controller
 connectPeers("CartOptCtrl",getRobotName())

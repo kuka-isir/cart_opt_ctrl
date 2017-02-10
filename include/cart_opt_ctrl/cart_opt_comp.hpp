@@ -19,6 +19,7 @@
 #include <eigen_conversions/eigen_kdl.h>
 #include <kdl/frames_io.hpp>
 #include <kdl_conversions/kdl_msg.h>
+#include <cart_opt_ctrl/GetCurrentPose.h>
 
 
 class CartOptCtrl : public RTT::TaskContext{
@@ -30,6 +31,8 @@ class CartOptCtrl : public RTT::TaskContext{
     bool startHook();
     void updateHook();
     void stopHook();
+    
+    bool getCurrentPose(cart_opt_ctrl::GetCurrentPose::Request& req, cart_opt_ctrl::GetCurrentPose::Response& resp);
     
   protected:
     // Output ports
