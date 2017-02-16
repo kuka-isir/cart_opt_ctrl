@@ -264,7 +264,7 @@ void CartOptCtrl::updateHook(){
   if (button_pressed_)
     transition_gain_ = 0.0;
   else
-    transition_gain_ = std::min(1.0,transition_gain_ + 1e-06);
+    transition_gain_ = std::min(1.0,transition_gain_ + 0.001 * regularisation_weight_[0]);
   
   // Write cartesian tasks
   // The cartesian tasks can be decoupling by axes
@@ -275,13 +275,12 @@ void CartOptCtrl::updateHook(){
   for(int i=0; i<select_components_.size();i++){
     select_axis = select_axes_[i].asDiagonal();
     select_cartesian_component = select_components_[i].asDiagonal();
-    select_cartesian_component *= transition_gain_;
     
     a.noalias() =  J.data * select_axis * M_inv.data;
     b.noalias() = (- a * ( coriolis.data + gravity.data ) + jdot_qdot - xdd_des);
     
-    H += 2.0 * a.transpose() * select_cartesian_component * a;  
-    g += 2.0 * a.transpose() * select_cartesian_component * b;
+    H += transition_gain_ * 2.0 * a.transpose() * select_cartesian_component * a;  
+    g += transition_gain_ * 2.0 * a.transpose() * select_cartesian_component * b;
   }
   
   // Compute bounds
