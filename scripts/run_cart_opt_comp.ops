@@ -21,6 +21,7 @@ loadService("KDLTrajCompute","rosservice")
 KDLTrajCompute.rosservice.connect("updateWaypoints","/KDLTrajCompute/updateWaypoints","cart_opt_ctrl/UpdateWaypoints")
 stream("KDLTrajCompute.PathROSOut",ros.comm.topic("KDLTrajGen/path"))
 stream("KDLTrajCompute.PathPosesROSOut",ros.comm.topic("KDLTrajGen/pose_array"))
+stream("KDLTrajCompute.ButtonPressed",ros.comm.topic("activate_gravity"))
 
 loadComponent("CartOptCtrl","CartOptCtrl")
 // setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
