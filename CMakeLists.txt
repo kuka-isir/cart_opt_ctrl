@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(cart_opt_ctrl)
-sqdmlqskdmkqsmd
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_BUILD_TYPE Release)
 
@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
     controller_interface
     actionlib
     roscpp
+    rospy
     realtime_tools
     control_msgs
     trajectory_msgs
@@ -26,6 +27,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Eigen REQUIRED)
 find_package(orocos_kdl REQUIRED)
+
+catkin_python_setup()
 
 include_directories(
     include
