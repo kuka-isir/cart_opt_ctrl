@@ -8,14 +8,14 @@ int main(int argc, char** argv){
   ros::NodeHandle nh;
   
   geometry_msgs::PoseArray waypoints;
-  waypoints.header.frame_id = "link_0";
+  waypoints.header.frame_id = "base_link";
   waypoints.header.stamp = ros::Time::now();
   
   geometry_msgs::Pose pose;
-  pose.position.x = -0.052;
-  pose.position.y = -0.561;
-  pose.position.z = 0.420;
-  pose.orientation.x = -0.70711;
+  pose.position.x = 0.4;
+  pose.position.y = 0.0;
+  pose.position.z = 0.4;
+  pose.orientation.x = 0.70711;
   pose.orientation.y = 0.70711;
   pose.orientation.z = 0.0;
   pose.orientation.w = 0.0;
