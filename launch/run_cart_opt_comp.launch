@@ -20,6 +20,8 @@
 
   <!-- The end effector frame (you'll be able to use frames <= tip_link for cartesian position, jacobians etc.) -->
   <arg name="tip_link" default="ati_link"/>
+  <!-- The root_link will be frame used for sending goals to the cartesian controller -->
+  <arg name="root_link" default="base_link"/>
   <!-- Run Simulated robot (need to 'roslaunch rtt_lwr_gazebo lwr_gazebo.launch' first) -->
   <arg name="sim" default="false" />
   <!-- The global namespace if you need to change it (unlikely) -->
@@ -50,6 +52,7 @@
     regularisation_weight : [0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001]
     compensate_gravity : true
     damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    base_frame : $(arg root_link)
     frame_of_interest : "ati_link"
     select_components_0 : [1,1,1,1,1,1]
     select_axes_0 : [1,1,1,1,1,1,1]
@@ -83,6 +86,7 @@
     <arg name="rviz" value="$(arg rviz)" />
     <arg name="log_level" value="$(arg log_level)" />
     <arg name="tip_link" value="$(arg tip_link)"/>
+    <arg name="root_link" value="$(arg root_link)"/>
     <arg name="load_base" value="$(arg load_base)" />
     <arg name="load_table" value="$(arg load_table)" />
     <arg name="load_ati_sensor" value="$(arg load_ati_sensor)" />

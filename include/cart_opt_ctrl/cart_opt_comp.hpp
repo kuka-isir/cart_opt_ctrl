@@ -62,7 +62,7 @@ class CartOptCtrl : public RTT::TaskContext{
     KDL::Frame pt_pos_in_;
     KDL::Twist pt_vel_in_, pt_acc_in_;
     
-    std::string ee_frame_;
+    std::string ee_frame_, base_frame_;
     bool has_first_command_ = false;
 
     KDL::Frame X_traj_,X_curr_;

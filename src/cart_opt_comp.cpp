@@ -19,6 +19,7 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   
   // Orocos properties/ROS params
   this->addProperty("frame_of_interest",ee_frame_).doc("The robot frame to track the trajectory");
+  this->addProperty("base_frame",base_frame_).doc("The robot frame to track the trajectory");
   this->addProperty("p_gains",p_gains_).doc("Proportional gains");
   this->addProperty("d_gains",d_gains_).doc("Derivative gains");
   this->addProperty("position_saturation",position_saturation_).doc("Position saturation");
@@ -179,7 +180,7 @@ void CartOptCtrl::updateHook(){
   tf::poseKDLToMsg(X_traj_,x_des_pos_out);
   geometry_msgs::PoseStamped x_des_pos_stamped_out;
   x_des_pos_stamped_out.pose = x_des_pos_out;
-  x_des_pos_stamped_out.header.frame_id = "link_0";
+  x_des_pos_stamped_out.header.frame_id = base_frame_;
   x_des_pos_stamped_out.header.stamp = rtt_rosclock::host_now();
   port_x_des_.write(x_des_pos_stamped_out);
   trajectory_msgs::JointTrajectoryPoint joint_pos_vel;

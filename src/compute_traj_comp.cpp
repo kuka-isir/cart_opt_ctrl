@@ -29,7 +29,7 @@ KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
 bool KDLTrajCompute::updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& req, cart_opt_ctrl::UpdateWaypoints::Response& resp){  
   waypoints_in_ = req.waypoints;
   
-  // TODO Convert trajectory into "link_0" frame
+  // TODO Convert trajectory into root_link
   
   bool success = computeTrajectory();
   current_traj_time_ = 0.0;
@@ -114,6 +114,7 @@ bool KDLTrajCompute::computeTrajectory(){
     publishTrajectory();
   
     } catch(KDL::Error& error) {
+      std::cout <<"Tried planning with the following waypoints : \n" << waypoints_in_ << endlog();
       std::cout <<"I encountered this error : " << error.Description() << endlog();
       std::cout << "with the following type " << error.GetType() << endlog();
       return false;
