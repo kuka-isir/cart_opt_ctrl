@@ -12,24 +12,42 @@ KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
   this->addPort("ButtonPressed",port_button_pressed_in_);
   this->addOperation("updateWaypoints",&KDLTrajCompute::updateWaypoints,this,RTT::ClientThread);
   
+  this->addProperty("base_frame",base_frame_).doc("Max cartesian velocity");
   this->addProperty("vel_max",vel_max_).doc("Max cartesian velocity");
   this->addProperty("acc_max",acc_max_).doc("Max cartesian acceleration");
   this->addProperty("radius",radius_).doc("Radius for path roundness");
   this->addProperty("eqradius",eqradius_).doc("Equivalent radius for path roundness");
   
   // Default params
+  base_frame_ = "base_link";
   vel_max_ = 0.1;
   acc_max_ = 2.0;
   radius_ = 0.01;
   eqradius_ = 0.05;
   
   interpolator_ = new KDL::RotationalInterpolation_SingleAxis();
+  tf_ = new tf::TransformListener();
 }
 
 bool KDLTrajCompute::updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& req, cart_opt_ctrl::UpdateWaypoints::Response& resp){  
-  waypoints_in_ = req.waypoints;
   
-  // TODO Convert trajectory into root_link
+  // Transform the waypoints to the base_frame
+  geometry_msgs::PoseStamped tmp_pose_stmp;
+  tmp_pose_stmp.header = req.waypoints.header;
+  waypoints_in_.header = req.waypoints.header;
+  waypoints_in_.poses.clear();
+  waypoints_in_.poses.resize(req.waypoints.poses.size());
+  try{
+    for(int i=0; i<req.waypoints.poses.size(); i++){
+      tmp_pose_stmp.pose = req.waypoints.poses[i];
+      tf_->transformPose(base_frame_, tmp_pose_stmp, tmp_pose_stmp);
+      waypoints_in_.poses[i] = tmp_pose_stmp.pose;
+    }
+  }catch(tf::TransformException ex){
+    ROS_ERROR("%s",ex.what());
+    return false;
+  }
+  waypoints_in_.header.frame_id = base_frame_;
   
   bool success = computeTrajectory();
   current_traj_time_ = 0.0;

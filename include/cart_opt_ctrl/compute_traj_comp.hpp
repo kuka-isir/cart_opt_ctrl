@@ -17,6 +17,7 @@
 #include <kdl/utilities/error.h>
 
 #include <tf_conversions/tf_kdl.h>
+#include <tf/transform_listener.h>
 
 #include <geometry_msgs/PoseArray.h>
 #include <nav_msgs/Path.h>
@@ -54,12 +55,15 @@ class KDLTrajCompute : public RTT::TaskContext{
     
     double current_traj_time_, vel_max_, acc_max_, radius_, eqradius_;
     bool traj_computed_;
+    std::string base_frame_;
       
     KDL::Path_RoundedComposite* path_;
     KDL::Trajectory* traject_;
     KDL::Trajectory_Composite* ctraject_;
     KDL::VelocityProfile* vel_profile_;
     KDL::RotationalInterpolation_SingleAxis* interpolator_;
+    
+    tf::TransformListener* tf_;
 };
 
 ORO_LIST_COMPONENT_TYPE( KDLTrajCompute )
