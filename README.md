@@ -1,7 +1,8 @@
 Operational Space Optimal Controller
 ============
 
-### Reference
+### References
+1)
 ```
 Control of robots sharing their workspace with humans: an energetic approach to safety
 A. Meguenani, V. Padois and P. Bidaud
@@ -19,5 +20,29 @@ Bibtex:
     year = {2015},
     month = Sep,
     address = {Hamburg, Germany}
+}
+```
+2)
+```
+Energy based control for safe human-robot physical interaction
+A. Meguenani, V. Padois, J. Da Silva, A. Hoarau, P. Bidaud
+International Symposium on Experimental Robotics, 2016
+```
+Bibtex:
+```
+@incollection{meguenani:hal-01398790,
+  TITLE = {{Energy based control for safe human-robot physical interaction}},
+  AUTHOR = {Meguenani, Anis and Padois, Vincent and Da Silva, Jimmy and Hoarau, Antoine and Bidaud, Philippe},
+  URL = {https://hal.archives-ouvertes.fr/hal-01398790},
+  BOOKTITLE = {{ 2016 International Symposium on Experimental Robotics}},
+  EDITOR = {Dana Kuli{\'c}, Yoshihiko Nakamura, Oussama Khatib, Gentiane Venture},
+  PUBLISHER = {{Springer}},
+  SERIES = {Springer Proceedings in Advanced Robotics},
+  VOLUME = {1},
+  YEAR = {2017},
+  KEYWORDS = {Energy ; QP ; Safety ; Human-robot interaction ; Constraints compatibility},
+  PDF = {https://hal.archives-ouvertes.fr/hal-01398790/file/ISER2016_paper_133.pdf},
+  HAL_ID = {hal-01398790},
+  HAL_VERSION = {v1},
 }
 ```
