@@ -1,0 +1,9 @@
+// Import base script
+import("rtt_rospack")
+runScript(ros.find("lwr_utils")+"/scripts/utils.ops")
+
+// Load robot
+loadRobot(getRobotName(),isSim(),true)
+loadStatePublisher(true)
+loadROSControl(true)
+setJointTorqueControlMode()
