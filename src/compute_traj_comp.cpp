@@ -59,10 +59,10 @@ bool KDLTrajCompute::updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& re
     if(this->port_button_pressed_in_.read(button_pressed_msg_) != RTT::NoData){
       // If gravity compensation activated, return failure on service
       if (button_pressed_msg_.data){
-	current_traj_time_ = 0.0;
-	traj_computed_ = false;
-	resp.success = false;
-	return false;
+        current_traj_time_ = 0.0;
+        traj_computed_ = false;
+        resp.success = false;
+        return false;
       }
     }
     usleep(1e05);
@@ -111,10 +111,19 @@ bool KDLTrajCompute::computeTrajectory(){
     path_ = new KDL::Path_RoundedComposite(radius_,eqradius_,interpolator_);
 
     // Add all the waypoints to the path
-    KDL::Frame frame;
+    KDL::Frame frame, previous_frame;
     for(int i=0; i<waypoints_in_.poses.size(); i++){
       tf::poseMsgToKDL(waypoints_in_.poses[i], frame);
+      // If the previous points is too similar dont add it
+      if(i>0){
+        KDL::Twist err =  diff(frame, previous_frame);
+        if((std::abs(err(0))<0.01) && (std::abs(err(1))<0.01) && (std::abs(err(2))<0.01)){
+          ROS_INFO_STREAM("Skipping point #"<<i<<"of the path");
+          continue;
+        }
+      }
       path_->Add(frame);
+      previous_frame = frame;
     }
     path_->Finish();
     
