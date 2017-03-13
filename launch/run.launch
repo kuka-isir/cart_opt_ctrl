@@ -56,7 +56,7 @@
       regularisation_weight : [0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001]
       compensate_gravity : true
       damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-      base_frame : $(arg root_link)
+      base_frame : "$(arg root_link)"
       frame_of_interest : "ati_link"
       select_components_0 : [1,1,1,1,1,1]
       select_axes_0 : [1,1,1,1,1,1,1]
