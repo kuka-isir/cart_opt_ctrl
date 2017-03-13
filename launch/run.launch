@@ -75,7 +75,7 @@
     <!--============ KDLTrajCompute Params ============-->
     <rosparam ns="KDLTrajCompute" subst_value="true">
       base_frame : $(arg root_link)
-      vel_max : 1.0
+      vel_max : 0.1
       acc_max : 2.0
       radius : 0.01
       eqradius : 0.05

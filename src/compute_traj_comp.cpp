@@ -25,6 +25,12 @@ KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
   radius_ = 0.01;
   eqradius_ = 0.05;
   
+  // Match all properties (defined in the constructor) 
+  // with the rosparams in the namespace : 
+  // nameOfThisComponent/nameOftheProperty
+  // Equivalent to ros::param::get("CartOptCtrl/p_gains_");
+  rtt_ros_kdl_tools::getAllPropertiesFromROSParam(this);
+  
   interpolator_ = new KDL::RotationalInterpolation_SingleAxis();
   tf_ = new tf::TransformListener();
 }
