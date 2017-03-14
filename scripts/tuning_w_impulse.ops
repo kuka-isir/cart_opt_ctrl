@@ -1,0 +1,50 @@
+// Import base script
+import("rtt_rospack")
+runScript(ros.find("lwr_utils")+"/scripts/utils.ops")
+
+// Load robot
+loadRobot(getRobotName(),isSim(),true)
+loadStatePublisher(true)
+
+// Set initial robot configuration
+if (isSim()) then
+  setRobotInitialJointConfiguration(1.0,0.,0.0,-1.57,0.0,1.57,0.)
+setJointTorqueControlMode()
+
+import("rtt_ros")
+import("rtt_dynamic_reconfigure")
+
+// Load controller component
+ros.import("cart_opt_ctrl")
+loadComponent("CartOptCtrl","CartOptCtrl")
+// setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
+setActivity("CartOptCtrl",0.001,LowestPriority,ORO_SCHED_RT)
+loadService("CartOptCtrl","rosservice")
+CartOptCtrl.rosservice.connect("getCurrentPose","/CartOptCtrl/getCurrentPose","cart_opt_ctrl/GetCurrentPose")
+
+// Connect controller
+connectPeers("CartOptCtrl",getRobotName())
+connectStandardPorts("CartOptCtrl",getRobotName(),ConnPolicy())
+connectPeers("CartOptCtrl","KDLTrajCompute")
+stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
+stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
+stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
+stream("CartOptCtrl.ButtonPressed",ros.comm.topic("activate_gravity"))
+
+// Impulse component
+loadComponent("ImpulseComp","ImpulseComp")
+setActivity("ImpulseComp",0.001,HighestPriority,ORO_SCHED_RT)
+connectPeers("ImpulseComp",getRobotName())
+connectStandardPorts("ImpulseComp",getRobotName(),ConnPolicy())
+connectPeers("ImpulseComp","CartOptCtrl")
+connect("ImpulseComp.TrajectoryPointPosOut","CartOptCtrl.TrajectoryPointPosIn",ConnPolicy())
+connect("ImpulseComp.TrajectoryPointVelOut","CartOptCtrl.TrajectoryPointVelIn",ConnPolicy())
+connect("ImpulseComp.TrajectoryPointAccOut","CartOptCtrl.TrajectoryPointAccIn",ConnPolicy())
+
+// Configure & start impulse component
+configureComponent("ImpulseComp")
+startComponent("ImpulseComp")
+
+// Configure & start controller
+configureComponent("CartOptCtrl")
+startComponent("CartOptCtrl")

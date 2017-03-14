@@ -63,7 +63,7 @@ add_executable(send_simple_traj src/send_simple_traj.cpp)
 target_link_libraries(send_simple_traj ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 ## Orocos control and trajectory components
-orocos_component(${PROJECT_NAME} src/cart_opt_comp.cpp src/compute_traj_comp.cpp)
+orocos_component(${PROJECT_NAME} src/cart_opt_comp.cpp src/compute_traj_comp.cpp src/impulse_cart_comp.cpp)
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMPONENT)
 
 target_link_libraries(${PROJECT_NAME}
