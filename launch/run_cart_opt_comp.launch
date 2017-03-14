@@ -38,15 +38,23 @@
   <arg name="load_calib_tool" default="false" />
   <!-- Gazebo -->
   <arg name="gazebo_gui" default="false"/>
+  <!--  Modify root link  -->
+  <arg name="root_link" default="table_link" />
   
 <!--============ CartOptCtrl Params ============-->
   <rosparam ns="CartOptCtrl" subst_value="true">
-    torque_max : [175.0, 175.0, 99.0, 99.0, 99.0, 37.0, 37.0]
+    torque_max : [170.0, 170.0, 95.0, 95.0, 95.0, 32.0, 32.0]
     joint_vel_max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-    p_gains : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
-    d_gains : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
-    position_saturation : 0.01
+    p_gains : [3600.0, 9900.0, 6600.0, 4800.0, 4800.0, 4800.0]
+<!--     d_gains : [27.3,  27.3, 27.3, 27.3, 27.3, 27.3] -->
+<!--     i_gains : [6.4610, 6.4610, 6.4610, 6.4610, 6.4610, 6.4610] -->
+    d_gains : [153, 173.25, 132.0, 57.0, 57.75, 57.75]
+    i_gains : [21.0, 141.0, 82.5, 101.0, 101.0, 101.0] 
+    integral_saturation : 1.0
+    position_saturation : 0.05
     orientation_saturation : 0.0314
+    Ec_lim : 1
+    horizon : 15
     regularisation_weight : [0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001]
     compensate_gravity : true
     damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
@@ -77,6 +85,7 @@
 
   <include file="$(find lwr_utils)/launch/run.launch">
     <arg name="sim" value="$(arg sim)" />
+    <arg name="root_link" value="$(arg root_link)" />
     <arg name="ops_script" value="$(find cart_opt_ctrl)/scripts/run_cart_opt_comp.ops"/>
     <arg name="robot_ns" value="$(arg robot_ns)"/>
     <arg name="debug" value="$(arg debug)" />

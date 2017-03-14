@@ -17,6 +17,10 @@
 #include <std_msgs/Bool.h>
 
 #include <eigen_conversions/eigen_kdl.h>
+#include <eigen_conversions/eigen_msg.h>
+#include <std_msgs/Float64.h>
+#include <std_msgs/Float32MultiArray.h>
+
 #include <kdl/frames_io.hpp>
 #include <kdl_conversions/kdl_msg.h>
 #include <cart_opt_ctrl/GetCurrentPose.h>
@@ -33,13 +37,16 @@ class CartOptCtrl : public RTT::TaskContext{
     void stopHook();
     
     bool getCurrentPose(cart_opt_ctrl::GetCurrentPose::Request& req, cart_opt_ctrl::GetCurrentPose::Response& resp);
+    KDL::Rotation PointTarget(KDL::Frame frame_target, KDL::Frame frame_des);
+    double KineticEnergy();
+    Eigen::Matrix<double,2,1> GetPointingTarget(KDL::Frame frame,KDL::Frame frame_target);
     
   protected:
     // Output ports
     RTT::OutputPort<Eigen::VectorXd> port_joint_torque_out_;
-    RTT::OutputPort<geometry_msgs::PoseStamped> port_x_des_;
+    RTT::OutputPort<geometry_msgs::PoseStamped> port_x_des_,port_x_mes_;
     RTT::OutputPort<trajectory_msgs::JointTrajectoryPoint> port_joint_pos_vel_in_; 
-    RTT::OutputPort<geometry_msgs::Twist> port_error_out_; 
+    RTT::OutputPort<geometry_msgs::Twist> port_error_out_,port_Xd_out_,port_xdd_des_; 
     
     // Input ports
     RTT::InputPort<KDL::Frame> port_pnt_pos_in_;
@@ -65,19 +72,46 @@ class CartOptCtrl : public RTT::TaskContext{
     std::string ee_frame_;
     bool has_first_command_ = false;
 
-    KDL::Frame X_traj_,X_curr_;
+    KDL::Frame X_traj_,X_curr_,frame_target;
     KDL::Twist X_err_,Xd_err_,Xdd_err_;
     KDL::Twist Xd_curr_,Xdd_curr_,Xd_traj_,Xdd_traj_;
     KDL::Twist Xdd_des;
     
+    KDL::Twist integral_term,integral_term_sat;
+    double integral_saturation; 
+    
+    bool rotation;
+    
     Eigen::VectorXd regularisation_weight_, damping_weight_;
     double transition_gain_;
+    double Ec_lim;
+    double horizon;
     double position_saturation_, orientation_saturation_;
     bool compensate_gravity_;
-    Eigen::VectorXd p_gains_, d_gains_, torque_max_, jnt_vel_max_;
+    bool perturbation,inc;
+    int number_of_constraints;
+    string link_6_frame;
+    Eigen::VectorXd p_gains_, d_gains_, i_gains_, torque_max_, jnt_vel_max_;
+    Eigen::VectorXd target;
     std::vector<Eigen::VectorXd> select_components_, select_axes_;
 
     std::unique_ptr<qpOASES::SQProblem> qpoases_solver_;
+    
+    geometry_msgs::Twist xdd_des_msg,integral_term_msg;
+    std_msgs::Float64MultiArray delta_x_msg,
+				force_info_msg;
+				
+    RTT::OutputPort<std_msgs::Float64MultiArray> port_delta_x_info,
+						 port_force_info;
+						 
+    std_msgs::Float64MultiArray Ec_constraints_msg,kd_x_err_msg,Xdd_out_msg;
+    RTT::OutputPort<std_msgs::Float64MultiArray> port_Ec_constraints,port_kd_x_err,port_Xdd_out;
+    
+    std_msgs::Float64 positioning_error,pointing_error;
+    RTT::OutputPort<std_msgs::Float64> port_positioning_error,port_pointing_error;
+    
+    RTT::OutputPort< geometry_msgs::Twist> port_integral_term;
+    
 };
 
 ORO_CREATE_COMPONENT_LIBRARY()

@@ -8,7 +8,7 @@ loadStatePublisher(true)
 
 // Set initial robot configuration
 if (isSim()) then
-  setRobotInitialJointConfiguration(1.0,0.,0.0,-1.57,0.0,1.57,0.)
+  setRobotInitialJointConfiguration(1.0,0.,0.0,-1.57,0.0,1.57,0.0)
 setJointTorqueControlMode()
 
 import("rtt_ros")
@@ -37,9 +37,21 @@ connect("KDLTrajCompute.TrajectoryPointPosOut","CartOptCtrl.TrajectoryPointPosIn
 connect("KDLTrajCompute.TrajectoryPointVelOut","CartOptCtrl.TrajectoryPointVelIn",ConnPolicy())
 connect("KDLTrajCompute.TrajectoryPointAccOut","CartOptCtrl.TrajectoryPointAccIn",ConnPolicy())
 stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
+stream("CartOptCtrl.delta_x",ros.comm.topic("CartOptCtrl/delta_x"))
+stream("CartOptCtrl.force_info",ros.comm.topic("CartOptCtrl/force_info"))
+stream("CartOptCtrl.Ec_constraint",ros.comm.topic("CartOptCtrl/Ec_constraint"))
+stream("CartOptCtrl.PoseCurrent",ros.comm.topic("CartOptCtrl/PoseCurrent"))
+stream("CartOptCtrl.XddDes",ros.comm.topic("CartOptCtrl/XddDes"))
+stream("CartOptCtrl.Xd_Out",ros.comm.topic("CartOptCtrl/Xd_Out"))
+stream("CartOptCtrl.positioning_error",ros.comm.topic("CartOptCtrl/positioning_error"))
+stream("CartOptCtrl.pointing_error",ros.comm.topic("CartOptCtrl/pointing_error"))
+stream("CartOptCtrl.Xdd_out",ros.comm.topic("CartOptCtrl/Xdd_out"))
+stream("CartOptCtrl.Integral_term",ros.comm.topic("CartOptCtrl/Integral_term"))
+stream("CartOptCtrl.kd_x_err",ros.comm.topic("CartOptCtrl/kd_x_err"))
 stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
 stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
 stream("CartOptCtrl.ButtonPressed",ros.comm.topic("activate_gravity"))
+
 
 // Configure & start trajectory sender
 configureComponent("KDLTrajCompute")

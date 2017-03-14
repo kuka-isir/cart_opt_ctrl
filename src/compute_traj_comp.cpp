@@ -4,6 +4,12 @@ using namespace RTT;
 
 KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
 { 
+  // Default params
+  vel_max_ = 0.1;
+  acc_max_ = 2.0;
+  radius_ = 0.01;
+  eqradius_ = 0.05;
+  
   this->addPort("TrajectoryPointPosOut",port_pnt_pos_out_);
   this->addPort("TrajectoryPointVelOut",port_pnt_vel_out_);
   this->addPort("TrajectoryPointAccOut",port_pnt_acc_out_);
@@ -17,11 +23,7 @@ KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
   this->addProperty("radius",radius_).doc("Radius for path roundness");
   this->addProperty("eqradius",eqradius_).doc("Equivalent radius for path roundness");
   
-  // Default params
-  vel_max_ = 0.1;
-  acc_max_ = 2.0;
-  radius_ = 0.01;
-  eqradius_ = 0.05;
+
   
   interpolator_ = new KDL::RotationalInterpolation_SingleAxis();
 }

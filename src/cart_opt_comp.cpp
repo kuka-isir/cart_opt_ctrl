@@ -13,14 +13,27 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addPort("TrajectoryPointVelIn",port_pnt_vel_in_);
   this->addPort("TrajectoryPointAccIn",port_pnt_acc_in_);
   this->addPort("PoseDesired",port_x_des_);
+  this->addPort("PoseCurrent",port_x_mes_);
   this->addPort("JointPosVelIn",port_joint_pos_vel_in_);
   this->addPort("PoseErrorOut",port_error_out_);
   this->addPort("ButtonPressed",port_button_pressed_in_);
+  this->addPort("Ec_constraint",port_Ec_constraints);
+  this->addPort("force_info",port_force_info);
+  this->addPort("delta_x",port_delta_x_info);
+  this->addPort("XddDes",port_xdd_des_);
+  this->addPort("Xd_Out",port_Xd_out_);
+  this->addPort("positioning_error",port_positioning_error);
+  this->addPort("pointing_error",port_pointing_error);
+  this->addPort("kd_x_err",port_kd_x_err);
+  this->addPort("Xdd_out",port_Xdd_out);
+  this->addPort("Integral_term",port_integral_term);
+  
   
   // Orocos properties/ROS params
   this->addProperty("frame_of_interest",ee_frame_).doc("The robot frame to track the trajectory");
   this->addProperty("p_gains",p_gains_).doc("Proportional gains");
   this->addProperty("d_gains",d_gains_).doc("Derivative gains");
+  this->addProperty("i_gains",i_gains_).doc("Integral gains");
   this->addProperty("position_saturation",position_saturation_).doc("Position saturation");
   this->addProperty("orientation_saturation",orientation_saturation_).doc("Orientation saturation");
   this->addProperty("regularisation_weight",regularisation_weight_).doc("Weight for the regularisation in QP");
@@ -28,6 +41,10 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addProperty("damping_weight",damping_weight_).doc("Weight for the damping in regularisation");
   this->addProperty("torque_max",torque_max_).doc("Max torque for each joint");
   this->addProperty("joint_vel_max",jnt_vel_max_).doc("Max velocity for each joint");
+  this->addProperty("integral_saturation",integral_saturation).doc("Saturation of the integral term");
+  this->addProperty("Ec_lim",Ec_lim).doc("Potential energy limit");
+  this->addProperty("horizon",horizon).doc("Time horizon (ms)");
+  this->addProperty("rotation",rotation).doc("Time horizon (ms)");
   
   select_components_.resize(6);
   select_axes_.resize(select_components_.size());
@@ -48,6 +65,81 @@ bool CartOptCtrl::getCurrentPose(cart_opt_ctrl::GetCurrentPose::Request& req, ca
   return true;
 }
 
+KDL::Rotation CartOptCtrl::PointTarget(KDL::Frame frame_target, KDL::Frame frame_des)
+{
+  //Direction axe z en soustrayant le point actuel vs le point visé
+
+  KDL::Vector dir_des = frame_target.p - frame_des.p;
+  double ray_length = dir_des.Norm();
+  dir_des.Normalize();
+
+  //Calcul de la direction actuelle selon z
+  KDL::Vector axe_curr_z = frame_des.M * KDL::Vector(0,0,1);
+
+  //Calcul de l'angle entre la direction actuelle et la direction desirée
+  double theta = acos(KDL::dot(dir_des,axe_curr_z));
+
+  //Calcul de l'axe de rotation autour des z
+  KDL::Vector axe_rot = axe_curr_z*dir_des;
+  axe_rot.Normalize();
+
+  double x,y,z;
+  x = axe_rot(0);
+  y = axe_rot(1);
+  z = axe_rot(2);
+
+  // Matrice de rotation angle(theta),origine(frame_des.p)
+  Eigen::Matrix<double,3,3>mat;
+  mat.setZero();
+
+  mat(0,0) = cos(theta) + x*x * (1-cos(theta));
+  mat(0,1) = x*y*(1-cos(theta)) - z*sin(theta);
+  mat(0,2) = x*z*(1-cos(theta)) + y*sin(theta);
+
+  mat(1,0) = y*x*(1-cos(theta)) + z*sin(theta);
+  mat(1,1) = cos(theta) + y*y*(1-cos(theta));
+  mat(1,2) = y*z*(1-cos(theta)) - x*sin(theta);
+
+  mat(2,0) = z*x*(1-cos(theta))-y*sin(theta);
+  mat(2,1) = z*y*(1-cos(theta)) + x*sin(theta);
+  mat(2,2) = cos(theta) + z*z*(1-cos(theta));
+
+  KDL::Rotation matrot(mat(0,0),mat(0,1),mat(0,2),mat(1,0),mat(1,1),mat(1,2),mat(2,0),mat(2,1),mat(2,2));
+
+  // Rotation de theta autour de l'axe orthogonal à la direction selon z
+  KDL::Rotation rot2 = matrot*frame_des.M;
+
+  return rot2;
+}
+
+Eigen::Matrix<double,2,1> CartOptCtrl::GetPointingTarget(KDL::Frame frame,KDL::Frame frame_target)
+{
+  // Projection on frame target plan
+  Eigen::Matrix<double,2,1> X_projection;
+  KDL::Vector dir = frame.M * KDL::Vector(0,0,1);
+
+  X_projection(0) = frame.p.x()- dir(0)/dir(2)*(frame.p.z()-frame_target.p.z()); // X projection on the plan (0,0,targetx)
+  X_projection(1) = frame.p.y()- dir(1)/dir(2)*(frame.p.z()-frame_target.p.z()); // Y projection on the plan (0,0,targety)
+
+  return X_projection;
+}
+
+ double CartOptCtrl::KineticEnergy()
+  {
+    Eigen::Matrix<double,6,6> Lambda;
+    Eigen::Matrix<double,6,1> Xd_mes_;
+    KDL::Jacobian jacobian = arm_.getSegmentJacobian(ee_frame_);
+    KDL::Twist Xd_mes = arm_.getSegmentVelocity(ee_frame_);
+    tf::twistKDLToEigen(Xd_mes,Xd_mes_);
+    KDL::JntSpaceInertiaMatrix mass_kdl_inverse = arm_.getInertiaInverseMatrix();
+    
+    Lambda = ( jacobian.data * mass_kdl_inverse.data * jacobian.data.transpose() ).inverse();
+   
+    return 0.5 * Xd_mes_.transpose() * Lambda * Xd_mes_;
+  }
+
+
+
 bool CartOptCtrl::configureHook(){
   // Initialise the model, the internal solvers etc
   if( ! arm_.init() ){
@@ -64,6 +156,7 @@ bool CartOptCtrl::configureHook(){
   jnt_vel_max_.resize(dof);
   regularisation_weight_.resize(dof);
   damping_weight_.resize(dof);
+  perturbation = false;
   for(int i = 0; i<select_components_.size() ; i++){
     select_components_[i].resize(6);
     select_axes_[i].resize(dof);
@@ -74,10 +167,15 @@ bool CartOptCtrl::configureHook(){
   
   // Default params
   ee_frame_ = arm_.getSegmentName( arm_.getNrOfSegments() - 1 );
+  
+  link_6_frame = "link_6";
+  target.resize(3);
   p_gains_ << 1000,1000,1000,1000,1000,1000;
   d_gains_ << 22,22,22,22,22,22;
+  integral_saturation = 0.0;
   position_saturation_ = 0.01;
   orientation_saturation_ = M_PI/100;
+  horizon = 15;
   regularisation_weight_ << 1e-05,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05;
   damping_weight_  << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
   compensate_gravity_ = true;
@@ -99,7 +197,7 @@ bool CartOptCtrl::configureHook(){
   
   // For now we have 0 constraints for now
   int number_of_variables = dof;
-  int number_of_constraints = dof;
+  number_of_constraints = dof+1;  
   qpoases_solver_.reset(new qpOASES::SQProblem(number_of_variables,number_of_constraints,qpOASES::HST_POSDEF));
   
   // QPOases options
@@ -140,6 +238,7 @@ void CartOptCtrl::updateHook(){
   arm_.setState(this->joint_position_in_,this->joint_velocity_in_);
   // Make some calculations
   arm_.updateModel();
+//   arm_.printChain();
   
   // Get Current end effector Pose
   X_curr_ = arm_.getSegmentPosition(ee_frame_);
@@ -155,13 +254,22 @@ void CartOptCtrl::updateHook(){
     X_traj_ = pt_pos_in_;
     Xd_traj_ = pt_vel_in_;
     Xdd_traj_ = pt_acc_in_;
-      
+    
     has_first_command_ = true;
   }
   else{
     log(RTT::Warning) << "Trajectory ports empty !" << endlog();
     return;
   }
+  target << X_traj_.p.x() , X_traj_.p.y() ,0.0;
+//   target << 0.435 , 0.0 , 0.0;
+  KDL::Frame link_6_pos = arm_.getSegmentPosition(link_6_frame);
+  frame_target = Frame(Rotation::RPY(0.0,0.0,0.0),Vector(target(0),target(1),target(2)));
+  KDL::Rotation rotz = PointTarget(frame_target,link_6_pos);
+  
+//   X_traj_ = KDL::Frame(rotz,pt_pos_in_.p);
+  
+  
   
   // First step, initialise the first X,Xd,Xdd desired
   if(!has_first_command_){
@@ -173,25 +281,46 @@ void CartOptCtrl::updateHook(){
   // Compute errors
   X_err_ = diff( X_curr_ , X_traj_ );
   Xd_err_ = diff( Xd_curr_ , Xd_traj_);
-  
+
   // Debug publish in ROS
   geometry_msgs::Pose x_des_pos_out;
   tf::poseKDLToMsg(X_traj_,x_des_pos_out);
   geometry_msgs::PoseStamped x_des_pos_stamped_out;
   x_des_pos_stamped_out.pose = x_des_pos_out;
-  x_des_pos_stamped_out.header.frame_id = "link_0";
+  x_des_pos_stamped_out.header.frame_id = "table_link";
   x_des_pos_stamped_out.header.stamp = rtt_rosclock::host_now();
   port_x_des_.write(x_des_pos_stamped_out);
+
+  geometry_msgs::Pose x_mes_pos_out;
+  tf::poseKDLToMsg(X_curr_,x_mes_pos_out);
+  geometry_msgs::PoseStamped x_mes_pos_stamped_out;
+  x_mes_pos_stamped_out.pose = x_mes_pos_out;
+  x_mes_pos_stamped_out.header.frame_id = "table_link";
+  x_mes_pos_stamped_out.header.stamp = rtt_rosclock::host_now();
+  port_x_mes_.write(x_mes_pos_stamped_out);
+
+  
   trajectory_msgs::JointTrajectoryPoint joint_pos_vel;
   for(int i=0; i< arm_.getNrOfJoints(); i++){
-    joint_pos_vel.positions.push_back(joint_position_in_(i));
-    joint_pos_vel.velocities.push_back(joint_velocity_in_(i));
+    joint_pos_vel.positions.push_back(joint_position_in_(i)*180.0/3.14159);
+    joint_pos_vel.velocities.push_back(joint_velocity_in_(i)*180.0/3.14159);
   }
-  port_joint_pos_vel_in_.write(joint_pos_vel);
-  geometry_msgs::Twist error_twist_ros;
-  tf::twistKDLToMsg(X_err_, error_twist_ros);
-  port_error_out_.write(error_twist_ros);
   
+  geometry_msgs::Twist Xd_twist_ros;
+  tf::twistKDLToMsg(Xd_curr_, Xd_twist_ros);
+  port_Xd_out_.write(Xd_twist_ros);
+
+  // Projection on target plan
+  Eigen::Matrix<double,2,1> Xx;
+  Xx = GetPointingTarget(Frame(X_curr_.M,X_curr_.p),frame_target);
+  pointing_error.data = sqrt(pow(target(0)-Xx(0),2)+pow(target(1)-Xx(1),2))*1000; // Pointing_error in mm;
+  
+  positioning_error.data=X_err_.vel.Norm();
+  
+  port_pointing_error.write(pointing_error);
+  port_positioning_error.write(positioning_error);
+  
+
   // Saturate the pose error
   for(unsigned int i=0; i<3; ++i ){
     if(X_err_(i) >0)
@@ -206,12 +335,34 @@ void CartOptCtrl::updateHook(){
       X_err_(i) = std::max(-orientation_saturation_, X_err_(i));
   }    
   
-  // Apply PD 
+  // Integral term and saturation
   for( unsigned int i=0; i<6; ++i )
-    Xdd_des(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) + d_gains_(i) * ( Xd_err_(i) );
+  {
+     integral_term(i) += X_err_(i);
+     if (i_gains_(i)*integral_term(i)>0)
+       integral_term_sat(i) = std::min(i_gains_(i)*integral_term(i),integral_saturation);
+     else
+       integral_term_sat(i) = std::max(i_gains_(i)*integral_term(i),-integral_saturation);
+     /*integral_term_sat(i)=(i_gains_(i)*integral_term(i) < -integral_saturation)? -integral_saturation: i_gains_(i)*integral_term(i);
+     integral_term_sat(i)=(i_gains_(i)*integral_term(i) >  integral_saturation)?  integral_saturation: i_gains_(i)*integral_term(i);*/  
+  }
+  
+  tf::TwistKDLToMsg(integral_term_sat,integral_term_msg);
+  port_integral_term.write(integral_term_msg);
+  
+  port_joint_pos_vel_in_.write(joint_pos_vel);
+  geometry_msgs::Twist error_twist_ros;
+  tf::twistKDLToMsg(X_err_, error_twist_ros);
+  port_error_out_.write(error_twist_ros);
+
+  // Apply PID 
+  for( unsigned int i=0; i<6; ++i )
+    Xdd_des(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) + d_gains_(i) * ( Xd_err_(i) ) /*+ integral_term_sat(i)*/ ;
+  
   
   Eigen::Matrix<double,6,1> xdd_des;
   tf::twistKDLToEigen(Xdd_des,xdd_des);
+  tf::twistKDLToMsg(Xdd_des,xdd_des_msg);
       
   KDL::Jacobian& J = arm_.getSegmentJacobian(ee_frame_);
   
@@ -236,7 +387,7 @@ void CartOptCtrl::updateHook(){
   // And we have Xdd_des = Xdd_traj_ + p_gains_.( X_des - X_curr_) + d_gains_.( Xd_des - Xd_curr_)
   // ==> We want to compute min(T) || Xdd - Xdd_des ||²
   // If with replace, we can put it in the form ax + b
-  // With a = 00001J.Minv
+  // With a = J.Minv
   //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
 
   Eigen::MatrixXd regularisation = regularisation_weight_.asDiagonal();
@@ -250,9 +401,9 @@ void CartOptCtrl::updateHook(){
   
   // Regularisation task
   // Can be tau, tau-g or tau-g-b*qdot
-  H = 2.0 * regularisation;
+  H = 2.0 * M_inv.data;
   if (compensate_gravity_)
-    g = - 2.0* (regularisation * (gravity.data - damping* joint_velocity_in_));
+    g = - 2.0* (M_inv.data * (gravity.data - damping* joint_velocity_in_));
   
   // Read button press port
   if(this->port_button_pressed_in_.read(button_pressed_msg_) != RTT::NoData){
@@ -275,7 +426,7 @@ void CartOptCtrl::updateHook(){
   for(int i=0; i<select_components_.size();i++){
     select_axis = select_axes_[i].asDiagonal();
     select_cartesian_component = select_components_[i].asDiagonal();
-    
+
     a.noalias() =  J.data * select_axis * M_inv.data;
     b.noalias() = (- a * ( coriolis.data + gravity.data ) + jdot_qdot - xdd_des);
     
@@ -290,19 +441,17 @@ void CartOptCtrl::updateHook(){
   ub = torque_max_;    
   
   // Update Constraints
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(arm_.getNrOfJoints(),arm_.getNrOfJoints());
-  Eigen::VectorXd lbA(arm_.getNrOfJoints()),
-		  ubA(arm_.getNrOfJoints()),
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(number_of_constraints,arm_.getNrOfJoints());
+  Eigen::VectorXd lbA(number_of_constraints),
+		  ubA(number_of_constraints),
 		  qd_min(arm_.getNrOfJoints()),
 		  qd_max(arm_.getNrOfJoints());
   
   qd_max = jnt_vel_max_;
   qd_min = -jnt_vel_max_;
   
-  A = arm_.getInertiaInverseMatrix().data;
-  
-  // TODO Param this ???
-  double horizon_dt = 0.015;
+
+  double horizon_dt = horizon*this->getPeriod();
   
   Eigen::VectorXd nonLinearTerms(arm_.getNrOfJoints());
   nonLinearTerms = arm_.getInertiaInverseMatrix().data * ( coriolis.data + gravity.data );    
@@ -327,13 +476,41 @@ void CartOptCtrl::updateHook(){
 //         ddq_upper[i] = fmin( ddq_upper[i], -current_jnt_vel[i] / tlim  ); // ddq <= dq^2 / (2(q-qmax))
 //   }
 
-  lbA = (( qd_min - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMax(
-      2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
+   Eigen::Matrix<double,6,6> Lambda;
+   Lambda.setZero();
   
-  ubA = (( qd_max - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMin(
-      2*(arm_.getJointUpperLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
+   Lambda = (J.data*M_inv.data*J.data.transpose()).inverse();
+      
+   double Ec_curr = KineticEnergy();
+   Eigen::Matrix<double,6,1> Xd_curr;Xd_curr.setZero();
+   Eigen::Matrix<double,1,6> delta_x;delta_x.setZero();
+   tf::twistKDLToEigen( Xd_curr_ , Xd_curr);
+   
+   delta_x = (horizon_dt * Xd_curr + 0.5 * horizon_dt * horizon_dt * xdd_des).transpose(); 
+
+   Eigen::Matrix<double,1,7> A_ec;
+   double B_ec;
+   
+   A_ec = delta_x * Lambda * J.data * M_inv.data;
+   B_ec = Ec_curr + delta_x * Lambda * (jdot_qdot - J.data * M_inv.data *(coriolis.data + gravity.data));
+
+   lbA.block(0,0,7,1) = (( qd_min - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMax(
+   2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
+  
+   ubA.block(0,0,7,1) = (( qd_max - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMin(
+  2*(arm_.getJointUpperLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
+  
+  lbA(7) = 0.0 - B_ec;
+  ubA(7) = Ec_lim - B_ec;  
   
   
+  A.block(0,0,7,7) = arm_.getInertiaInverseMatrix().data;
+  A.block(7,0,1,7) = A_ec;
+    
+    
+
+    
+    
   // number of allowed compute steps
   int nWSR = 1e6; 
   
@@ -370,8 +547,42 @@ void CartOptCtrl::updateHook(){
   else
     log(RTT::Error) << "QPOases failed!" << endlog();
 
+    Eigen::Matrix<double,6,1> force_info;
+  force_info = Lambda*(jdot_qdot+J.data*M_inv.data*(joint_torque_out_+arm_.getGravityTorque().data-coriolis.data-gravity.data));
+  double Ec_constraint = B_ec+A_ec*(joint_torque_out_+arm_.getGravityTorque().data);
+
+  tf::matrixEigenToMsg(force_info,force_info_msg);
+  tf::matrixEigenToMsg(delta_x,delta_x_msg);
+  
+  Eigen::Matrix<double,2,1> Ec_constraints;
+  Ec_constraints(0) = Ec_constraint;
+  Ec_constraints(1) = Ec_lim;
+  tf::matrixEigenToMsg(Ec_constraints,Ec_constraints_msg);
+  port_Ec_constraints.write(Ec_constraints_msg);
+  
+  Eigen::Matrix<double,6,1> Xdd_out;
+  Xdd_out = jdot_qdot + J.data * M_inv.data * ( joint_torque_out_ - coriolis.data );
+  tf::matrixEigenToMsg(Xdd_out,Xdd_out_msg);
+  port_Xdd_out.write(Xdd_out_msg);
+  
+  Eigen::Matrix<double,3,1> kd_x_err;
+  for (int i=0;i<3;i++)
+    kd_x_err(i) = p_gains_(i) * ( X_err_(i) );
+  tf::matrixEigenToMsg(kd_x_err,kd_x_err_msg);
+  port_kd_x_err.write(kd_x_err_msg);
+  
+  Ec_constraints(0) = Ec_constraint;
+  Ec_constraints(1) = Ec_lim;
+  tf::matrixEigenToMsg(Ec_constraints,Ec_constraints_msg);
+  port_Ec_constraints.write(Ec_constraints_msg);
+      
+  port_force_info.write(force_info_msg);
+  port_delta_x_info.write(delta_x_msg);
+  port_xdd_des_.write(xdd_des_msg);
+
   // Send torques to the robot
-  port_joint_torque_out_.write(joint_torque_out_);
+  port_joint_torque_out_.write(joint_torque_out_+arm_.getGravityTorque().data-coriolis.data-gravity.data);
+
 }
 
 
