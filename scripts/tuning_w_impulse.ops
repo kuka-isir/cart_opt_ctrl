@@ -12,7 +12,6 @@ if (isSim()) then
 setJointTorqueControlMode()
 
 import("rtt_ros")
-import("rtt_dynamic_reconfigure")
 
 // Load controller component
 ros.import("cart_opt_ctrl")
@@ -25,7 +24,6 @@ CartOptCtrl.rosservice.connect("getCurrentPose","/CartOptCtrl/getCurrentPose","c
 // Connect controller
 connectPeers("CartOptCtrl",getRobotName())
 connectStandardPorts("CartOptCtrl",getRobotName(),ConnPolicy())
-connectPeers("CartOptCtrl","KDLTrajCompute")
 stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
 stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
 stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))

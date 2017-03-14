@@ -27,16 +27,21 @@
  
   <!--============ CartOptCtrl Params ============-->
   <rosparam ns="CartOptCtrl" subst_value="true">
-    torque_max : [175.0, 175.0, 99.0, 99.0, 99.0, 37.0, 37.0]
+    torque_max : [170.0, 170.0, 95.0, 95.0, 95.0, 32.0, 32.0]
     joint_vel_max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-    p_gains : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
-    d_gains : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
-    position_saturation : 1.0
-    orientation_saturation : 3.0
+    p_gains : [840.0,840.0,840.0,840.0,840.0,840.0]
+    d_gains : [27.3,  27.3, 27.3, 27.3, 27.3, 27.3]
+    i_gains : [6.4610, 6.4610, 6.4610, 6.4610, 6.4610, 6.4610]
+    <!--d_gains : [0.0,0.0,0.0,0.0,0.0,0.0] -->
+    <!--i_gains : [0.0,0.0,0.0,0.0,0.0,0.0] -->
+    integral_saturation : 1.0
+    position_saturation : 0.05
+    orientation_saturation : 0.0314159
+    Ec_lim : 0.2
+    horizon : 15
     regularisation_weight : [0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001]
     compensate_gravity : true
     damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-    base_frame : "$(arg root_link)"
     frame_of_interest : "ati_link"
     select_components_0 : [1,1,1,1,1,1]
     select_axes_0 : [1,1,1,1,1,1,1]
