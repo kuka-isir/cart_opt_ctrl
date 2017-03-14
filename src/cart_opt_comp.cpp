@@ -241,7 +241,7 @@ void CartOptCtrl::updateHook(){
   //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
 
   Eigen::MatrixXd regularisation = regularisation_weight_.asDiagonal();
-  Eigen::MatrixXd damping = regularisation_weight_.asDiagonal();
+  Eigen::MatrixXd damping = damping_weight_.asDiagonal();
   
   // Matrices for qpOASES
   // NOTE: We need RowMajor (see qpoases doc)
