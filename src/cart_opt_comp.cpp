@@ -29,8 +29,9 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addProperty("damping_weight",damping_weight_).doc("Weight for the damping in regularisation");
   this->addProperty("torque_max",torque_max_).doc("Max torque for each joint");
   this->addProperty("joint_vel_max",jnt_vel_max_).doc("Max velocity for each joint");
-  this->addProperty("cart_min_constraints",cart_min_constraints_).doc("Max velocity for each joint");
-  this->addProperty("cart_max_constraints",cart_max_constraints_).doc("Max velocity for each joint");
+  this->addProperty("cart_min_constraints",cart_min_constraints_).doc("Max cartesian position constraints");
+  this->addProperty("cart_max_constraints",cart_max_constraints_).doc("Min cartesian position constraints");
+  this->addProperty("horizon_steps",horizon_steps_).doc("Number of period to anticipate");
   
   select_components_.resize(6);
   select_axes_.resize(select_components_.size());
@@ -86,6 +87,7 @@ bool CartOptCtrl::configureHook(){
   damping_weight_  << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
   cart_min_constraints_.setConstant(3, -10.0);
   cart_max_constraints_.setConstant(3, 10.0);
+  horizon_steps_ = 15.0; 
   compensate_gravity_ = true;
   for(int i = 1; i<select_components_.size() ; i++){
     select_components_[i].setZero(6);
@@ -308,8 +310,7 @@ void CartOptCtrl::updateHook(){
   A.block(0,0,7,7) = arm_.getInertiaInverseMatrix().data;
   A.block(7,0,3,7) = (J.data*arm_.getInertiaInverseMatrix().data).block(0,0,3,7);
   
-  // TODO Param this ???
-  double horizon_dt = 0.015;
+  double horizon_dt = horizon_steps_* this->getPeriod();
   
   Eigen::VectorXd nonLinearTerms(arm_.getNrOfJoints());
   nonLinearTerms = arm_.getInertiaInverseMatrix().data * ( coriolis.data + gravity.data );    
