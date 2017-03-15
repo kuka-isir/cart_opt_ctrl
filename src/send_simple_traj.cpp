@@ -26,7 +26,7 @@ int main(int argc, char** argv){
   KDL::Frame curr_pos_kdl ;
   tf::PoseMsgToKDL(curr_pos_msg,curr_pos_kdl );
   //Do a rotation along a XYZ axis
-  curr_pos_kdl.M.DoRotZ(-5.0*3.141519/180.0);
+  curr_pos_kdl.M.DoRotX(2.0/100.0);
   tf::PoseKDLToMsg(curr_pos_kdl ,curr_pos_msg);
   
   waypoints.poses.push_back(curr_pos_msg);

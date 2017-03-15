@@ -27,6 +27,8 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addPort("kd_x_err",port_kd_x_err);
   this->addPort("Xdd_out",port_Xdd_out);
   this->addPort("Integral_term",port_integral_term);
+  this->addPort("Xdd_des_const",port_xdd_des_const_);
+  this->addPort("Xd_curr_const",port_Xd_out_const_);
   
   
   // Orocos properties/ROS params
@@ -238,7 +240,6 @@ void CartOptCtrl::updateHook(){
   arm_.setState(this->joint_position_in_,this->joint_velocity_in_);
   // Make some calculations
   arm_.updateModel();
-//   arm_.printChain();
   
   // Get Current end effector Pose
   X_curr_ = arm_.getSegmentPosition(ee_frame_);
@@ -262,12 +263,11 @@ void CartOptCtrl::updateHook(){
     return;
   }
   target << X_traj_.p.x() , X_traj_.p.y() ,0.0;
-//   target << 0.435 , 0.0 , 0.0;
   KDL::Frame link_6_pos = arm_.getSegmentPosition(link_6_frame);
   frame_target = Frame(Rotation::RPY(0.0,0.0,0.0),Vector(target(0),target(1),target(2)));
-  KDL::Rotation rotz = PointTarget(frame_target,link_6_pos);
+  KDL::Rotation rotz = PointTarget(frame_target,X_curr_);
   
-//   X_traj_ = KDL::Frame(rotz,pt_pos_in_.p);
+  X_traj_ = KDL::Frame(rotz,pt_pos_in_.p);
   
   
   
@@ -306,6 +306,8 @@ void CartOptCtrl::updateHook(){
     joint_pos_vel.velocities.push_back(joint_velocity_in_(i)*180.0/3.14159);
   }
   
+    port_joint_pos_vel_in_.write(joint_pos_vel);
+  
   geometry_msgs::Twist Xd_twist_ros;
   tf::twistKDLToMsg(Xd_curr_, Xd_twist_ros);
   port_Xd_out_.write(Xd_twist_ros);
@@ -324,18 +326,18 @@ void CartOptCtrl::updateHook(){
   // Saturate the pose error
   for(unsigned int i=0; i<3; ++i ){
     if(X_err_(i) >0)
-      X_err_(i) = std::min(position_saturation_, X_err_(i));
+      X_err_(i) = std::min( position_saturation_, X_err_(i));
     else
       X_err_(i) = std::max(-position_saturation_, X_err_(i));
   }
   for(unsigned int i=3; i<6; ++i ){
     if(X_err_(i) >0)
-      X_err_(i) = std::min(orientation_saturation_, X_err_(i));
+      X_err_(i) = std::min( orientation_saturation_, X_err_(i));
     else
       X_err_(i) = std::max(-orientation_saturation_, X_err_(i));
   }    
   
-  // Integral term and saturation
+  //Integral term and saturation
   for( unsigned int i=0; i<6; ++i )
   {
      integral_term(i) += X_err_(i);
@@ -343,26 +345,37 @@ void CartOptCtrl::updateHook(){
        integral_term_sat(i) = std::min(i_gains_(i)*integral_term(i),integral_saturation);
      else
        integral_term_sat(i) = std::max(i_gains_(i)*integral_term(i),-integral_saturation);
-     /*integral_term_sat(i)=(i_gains_(i)*integral_term(i) < -integral_saturation)? -integral_saturation: i_gains_(i)*integral_term(i);
-     integral_term_sat(i)=(i_gains_(i)*integral_term(i) >  integral_saturation)?  integral_saturation: i_gains_(i)*integral_term(i);*/  
   }
   
-  tf::TwistKDLToMsg(integral_term_sat,integral_term_msg);
+  tf::twistKDLToMsg(integral_term_sat,integral_term_msg);
   port_integral_term.write(integral_term_msg);
   
-  port_joint_pos_vel_in_.write(joint_pos_vel);
+
   geometry_msgs::Twist error_twist_ros;
   tf::twistKDLToMsg(X_err_, error_twist_ros);
   port_error_out_.write(error_twist_ros);
 
   // Apply PID 
-  for( unsigned int i=0; i<6; ++i )
-    Xdd_des(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) + d_gains_(i) * ( Xd_err_(i) ) /*+ integral_term_sat(i)*/ ;
+  for( unsigned int i=0; i<3; ++i )
+    Xdd_des(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) - d_gains_(i) * ( Xd_curr_(i) ) + integral_term_sat(i) ;
+  for( unsigned int i=3; i<6; ++i )
+    Xdd_des(i) = 		p_gains_(i) * ( X_err_(i) ) - d_gains_(i) * ( Xd_curr_(i) ) + integral_term_sat(i) ;
   
   
   Eigen::Matrix<double,6,1> xdd_des;
   tf::twistKDLToEigen(Xdd_des,xdd_des);
-  tf::twistKDLToMsg(Xdd_des,xdd_des_msg);
+  tf::twistKDLToMsg(Xdd_des,xdd_des_msg)
+  ;
+  for( unsigned int i=0; i<6; ++i ){
+    Xdd_des(i) = 0.95*Old_xdd_des(i) + 0.05 * Xdd_des(i);
+    Xd_curr_(i) = 0.95*Old_xd_curr_(i) + 0.05 * Xd_curr_(i);
+    Old_xdd_des(i) = Xdd_des(i);
+    Old_xd_curr_(i) = Xd_curr_(i);
+  }
+  Eigen::Matrix<double,6,1> xdd_des_const;
+  tf::twistKDLToEigen(Xdd_des,xdd_des_const);
+  
+  tf::twistKDLToMsg(Xdd_des,xdd_des_const_msg);
       
   KDL::Jacobian& J = arm_.getSegmentJacobian(ee_frame_);
   
@@ -390,8 +403,9 @@ void CartOptCtrl::updateHook(){
   // With a = J.Minv
   //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
 
-  Eigen::MatrixXd regularisation = regularisation_weight_.asDiagonal();
-  Eigen::MatrixXd damping = regularisation_weight_.asDiagonal();
+//   Eigen::MatrixXd regularisation = regularisation_weight_.asDiagonal() * M_inv.data;
+  Eigen::MatrixXd regularisation = regularisation_weight_[0] * M_inv.data;
+  Eigen::MatrixXd damping = damping_weight_.asDiagonal();
   
   // Matrices for qpOASES
   // NOTE: We need RowMajor (see qpoases doc)
@@ -401,9 +415,9 @@ void CartOptCtrl::updateHook(){
   
   // Regularisation task
   // Can be tau, tau-g or tau-g-b*qdot
-  H = 2.0 * M_inv.data;
+  H = 2.0 * regularisation;
   if (compensate_gravity_)
-    g = - 2.0* (M_inv.data * (gravity.data - damping* joint_velocity_in_));
+    g = - 2.0* (regularisation * (gravity.data - damping* joint_velocity_in_));
   
   // Read button press port
   if(this->port_button_pressed_in_.read(button_pressed_msg_) != RTT::NoData){
@@ -485,8 +499,13 @@ void CartOptCtrl::updateHook(){
    Eigen::Matrix<double,6,1> Xd_curr;Xd_curr.setZero();
    Eigen::Matrix<double,1,6> delta_x;delta_x.setZero();
    tf::twistKDLToEigen( Xd_curr_ , Xd_curr);
+   geometry_msgs::Twist Xd_twist_ros_filt;
+//    std_msgs::Float64MultiArray Xd_twist_ros_filt;
+   tf::twistKDLToMsg(Xd_curr_, Xd_twist_ros_filt);
+   //tf::matrixEigenToMsg(J.data*joint_velocity_in_, Xd_twist_ros_filt);
+   port_Xd_out_const_.write(Xd_twist_ros_filt);
    
-   delta_x = (horizon_dt * Xd_curr + 0.5 * horizon_dt * horizon_dt * xdd_des).transpose(); 
+   delta_x = (horizon_dt * Xd_curr + 0.5 * horizon_dt * horizon_dt * xdd_des_const).transpose(); 
 
    Eigen::Matrix<double,1,7> A_ec;
    double B_ec;
@@ -506,10 +525,6 @@ void CartOptCtrl::updateHook(){
   
   A.block(0,0,7,7) = arm_.getInertiaInverseMatrix().data;
   A.block(7,0,1,7) = A_ec;
-    
-    
-
-    
     
   // number of allowed compute steps
   int nWSR = 1e6; 
@@ -547,7 +562,7 @@ void CartOptCtrl::updateHook(){
   else
     log(RTT::Error) << "QPOases failed!" << endlog();
 
-    Eigen::Matrix<double,6,1> force_info;
+  Eigen::Matrix<double,6,1> force_info;
   force_info = Lambda*(jdot_qdot+J.data*M_inv.data*(joint_torque_out_+arm_.getGravityTorque().data-coriolis.data-gravity.data));
   double Ec_constraint = B_ec+A_ec*(joint_torque_out_+arm_.getGravityTorque().data);
 
@@ -579,9 +594,10 @@ void CartOptCtrl::updateHook(){
   port_force_info.write(force_info_msg);
   port_delta_x_info.write(delta_x_msg);
   port_xdd_des_.write(xdd_des_msg);
+  port_xdd_des_const_.write(xdd_des_const_msg);
 
   // Send torques to the robot
-  port_joint_torque_out_.write(joint_torque_out_+arm_.getGravityTorque().data-coriolis.data-gravity.data);
+  port_joint_torque_out_.write(joint_torque_out_);
 
 }
 

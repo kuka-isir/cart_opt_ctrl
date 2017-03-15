@@ -46,7 +46,7 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::OutputPort<Eigen::VectorXd> port_joint_torque_out_;
     RTT::OutputPort<geometry_msgs::PoseStamped> port_x_des_,port_x_mes_;
     RTT::OutputPort<trajectory_msgs::JointTrajectoryPoint> port_joint_pos_vel_in_; 
-    RTT::OutputPort<geometry_msgs::Twist> port_error_out_,port_Xd_out_,port_xdd_des_; 
+    RTT::OutputPort<geometry_msgs::Twist> port_error_out_,port_Xd_out_,port_Xd_out_const_,port_xdd_des_,port_xdd_des_const_; 
     
     // Input ports
     RTT::InputPort<KDL::Frame> port_pnt_pos_in_;
@@ -74,8 +74,8 @@ class CartOptCtrl : public RTT::TaskContext{
 
     KDL::Frame X_traj_,X_curr_,frame_target;
     KDL::Twist X_err_,Xd_err_,Xdd_err_;
-    KDL::Twist Xd_curr_,Xdd_curr_,Xd_traj_,Xdd_traj_;
-    KDL::Twist Xdd_des;
+    KDL::Twist Xd_curr_,Old_xd_curr_,Xdd_curr_,Xd_traj_,Xdd_traj_;
+    KDL::Twist Old_xdd_des,Xdd_des;
     
     KDL::Twist integral_term,integral_term_sat;
     double integral_saturation; 
@@ -97,7 +97,7 @@ class CartOptCtrl : public RTT::TaskContext{
 
     std::unique_ptr<qpOASES::SQProblem> qpoases_solver_;
     
-    geometry_msgs::Twist xdd_des_msg,integral_term_msg;
+    geometry_msgs::Twist xdd_des_msg,xdd_des_const_msg,integral_term_msg;
     std_msgs::Float64MultiArray delta_x_msg,
 				force_info_msg;
 				

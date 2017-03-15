@@ -63,7 +63,7 @@ def main(argv):
 
       pose2 = copy.deepcopy(pose)
       pose2.position.x = 0.435
-      pose2.position.y = -0.44285015
+      pose2.position.y = -0.34285015
       waypoints.poses.append(pose2)
 
       client = rospy.ServiceProxy('/KDLTrajCompute/updateWaypoints', UpdateWaypoints)
@@ -80,7 +80,7 @@ def main(argv):
 
 	pose = Pose()
 	pose.position.x = 0.435
-	pose.position.y = -0.44285015
+	pose.position.y = -0.34285015
 	pose.position.z = 0.55
 	pose.orientation.x = 0.70711
 	pose.orientation.y = 0.70711
