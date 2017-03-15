@@ -65,7 +65,6 @@ bool CartOptCtrl::configureHook(){
   d_gains_.resize(6);
   torque_max_.resize(dof);
   jnt_vel_max_.resize(dof);
-  regularisation_weight_.resize(dof);
   damping_weight_.resize(dof);
   cart_min_constraints_.resize(3);
   cart_max_constraints_.resize(3);
@@ -83,7 +82,7 @@ bool CartOptCtrl::configureHook(){
   d_gains_ << 22,22,22,22,22,22;
   position_saturation_ = 0.01;
   orientation_saturation_ = M_PI/100;
-  regularisation_weight_ << 1e-05,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05;
+  regularisation_weight_ = 1e-05;
   damping_weight_  << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
   cart_min_constraints_.setConstant(3, -10.0);
   cart_max_constraints_.setConstant(3, 10.0);
@@ -246,7 +245,7 @@ void CartOptCtrl::updateHook(){
   // With a = 00001J.Minv
   //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
 
-  Eigen::MatrixXd regularisation = regularisation_weight_.asDiagonal();
+  Eigen::MatrixXd regularisation = regularisation_weight_* M_inv.data;
   Eigen::MatrixXd damping = damping_weight_.asDiagonal();
   
   // Matrices for qpOASES
@@ -271,7 +270,7 @@ void CartOptCtrl::updateHook(){
   if (button_pressed_)
     transition_gain_ = 0.0;
   else
-    transition_gain_ = std::min(1.0,transition_gain_ + 0.001 * regularisation_weight_[0]);
+    transition_gain_ = std::min(1.0,transition_gain_ + 0.001 * regularisation_weight_);
   
   // Write cartesian tasks
   // The cartesian tasks can be decoupling by axes

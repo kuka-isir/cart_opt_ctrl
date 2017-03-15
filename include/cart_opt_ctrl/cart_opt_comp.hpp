@@ -70,8 +70,8 @@ class CartOptCtrl : public RTT::TaskContext{
     KDL::Twist Xd_curr_,Xdd_curr_,Xd_traj_,Xdd_traj_;
     KDL::Twist Xdd_des;
     
-    Eigen::VectorXd regularisation_weight_, damping_weight_, cart_min_constraints_, cart_max_constraints_;
-    double transition_gain_;
+    Eigen::VectorXd damping_weight_, cart_min_constraints_, cart_max_constraints_;
+    double transition_gain_, regularisation_weight_;
     double position_saturation_, orientation_saturation_;
     bool compensate_gravity_;
     Eigen::VectorXd p_gains_, d_gains_, torque_max_, jnt_vel_max_;
