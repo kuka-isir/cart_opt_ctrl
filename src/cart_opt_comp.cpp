@@ -215,7 +215,7 @@ void CartOptCtrl::updateHook(){
   
   // Apply PD 
   for( unsigned int i=0; i<6; ++i )
-    Xdd_des(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) + d_gains_(i) * ( Xd_err_(i) );
+    Xdd_des(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) - d_gains_(i) * ( Xd_curr_(i) );
   
   Eigen::Matrix<double,6,1> xdd_des;
   tf::twistKDLToEigen(Xdd_des,xdd_des);
@@ -348,13 +348,9 @@ void CartOptCtrl::updateHook(){
   x_max.block(0,0,3,1) = cart_max_constraints_;
   x_min.block(0,0,3,1) = cart_min_constraints_;
   
-//   x_max << 0.9, 0.5, 5.0, 10000,10000,10000;
-//   x_min << -0.6, -0.25, 0.4, -10000,-10000,-10000;
-  
   Eigen::Matrix<double,6,1> xd_curr, x_curr;
   Eigen::Matrix<double,3,1> x_curr_lin;
   tf::twistKDLToEigen(Xd_curr_, xd_curr);
-//   x_curr << X_curr_.p(0), X_curr_.p(1), X_curr_.p(2), 10000,10000,10000;
   tf::vectorKDLToEigen(X_curr_.p, x_curr_lin);
   x_curr.block(0,0,3,1) = x_curr_lin;
 
