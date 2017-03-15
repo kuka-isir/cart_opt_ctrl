@@ -25,7 +25,6 @@ CartOptCtrl.rosservice.connect("getCurrentPose","/CartOptCtrl/getCurrentPose","c
 // Connect controller
 connectPeers("CartOptCtrl",getRobotName())
 connectStandardPorts("CartOptCtrl",getRobotName(),ConnPolicy())
-connectPeers("CartOptCtrl","KDLTrajCompute")
 stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
 stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
 stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
