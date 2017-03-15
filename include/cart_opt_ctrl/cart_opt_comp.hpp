@@ -70,7 +70,7 @@ class CartOptCtrl : public RTT::TaskContext{
     KDL::Twist Xd_curr_,Xdd_curr_,Xd_traj_,Xdd_traj_;
     KDL::Twist Xdd_des;
     
-    Eigen::VectorXd regularisation_weight_, damping_weight_;
+    Eigen::VectorXd regularisation_weight_, damping_weight_, cart_min_constraints_, cart_max_constraints_;
     double transition_gain_;
     double position_saturation_, orientation_saturation_;
     bool compensate_gravity_;
@@ -78,6 +78,7 @@ class CartOptCtrl : public RTT::TaskContext{
     std::vector<Eigen::VectorXd> select_components_, select_axes_;
 
     std::unique_ptr<qpOASES::SQProblem> qpoases_solver_;
+    int number_of_constraints_;
 };
 
 ORO_CREATE_COMPONENT_LIBRARY()

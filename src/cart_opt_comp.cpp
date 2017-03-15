@@ -29,6 +29,8 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addProperty("damping_weight",damping_weight_).doc("Weight for the damping in regularisation");
   this->addProperty("torque_max",torque_max_).doc("Max torque for each joint");
   this->addProperty("joint_vel_max",jnt_vel_max_).doc("Max velocity for each joint");
+  this->addProperty("cart_min_constraints",cart_min_constraints_).doc("Max velocity for each joint");
+  this->addProperty("cart_max_constraints",cart_max_constraints_).doc("Max velocity for each joint");
   
   select_components_.resize(6);
   select_axes_.resize(select_components_.size());
@@ -65,6 +67,8 @@ bool CartOptCtrl::configureHook(){
   jnt_vel_max_.resize(dof);
   regularisation_weight_.resize(dof);
   damping_weight_.resize(dof);
+  cart_min_constraints_.resize(3);
+  cart_max_constraints_.resize(3);
   for(int i = 0; i<select_components_.size() ; i++){
     select_components_[i].resize(6);
     select_axes_[i].resize(dof);
@@ -81,6 +85,8 @@ bool CartOptCtrl::configureHook(){
   orientation_saturation_ = M_PI/100;
   regularisation_weight_ << 1e-05,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05;
   damping_weight_  << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
+  cart_min_constraints_.setConstant(3, -10.0);
+  cart_max_constraints_.setConstant(3, 10.0);
   compensate_gravity_ = true;
   for(int i = 1; i<select_components_.size() ; i++){
     select_components_[i].setZero(6);
@@ -100,8 +106,8 @@ bool CartOptCtrl::configureHook(){
   
   // For now we have 0 constraints for now
   int number_of_variables = dof;
-  int number_of_constraints = dof;
-  qpoases_solver_.reset(new qpOASES::SQProblem(number_of_variables,number_of_constraints,qpOASES::HST_POSDEF));
+  number_of_constraints_ = dof + 3;
+  qpoases_solver_.reset(new qpOASES::SQProblem(number_of_variables,number_of_constraints_,qpOASES::HST_POSDEF));
   
   // QPOases options
   qpOASES::Options options;
@@ -291,16 +297,17 @@ void CartOptCtrl::updateHook(){
   ub = torque_max_;    
   
   // Update Constraints
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(arm_.getNrOfJoints(),arm_.getNrOfJoints());
-  Eigen::VectorXd lbA(arm_.getNrOfJoints()),
-		  ubA(arm_.getNrOfJoints()),
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(number_of_constraints_,arm_.getNrOfJoints());
+  Eigen::VectorXd lbA(number_of_constraints_),
+		  ubA(number_of_constraints_),
 		  qd_min(arm_.getNrOfJoints()),
 		  qd_max(arm_.getNrOfJoints());
   
   qd_max = jnt_vel_max_;
   qd_min = -jnt_vel_max_;
   
-  A = arm_.getInertiaInverseMatrix().data;
+  A.block(0,0,7,7) = arm_.getInertiaInverseMatrix().data;
+  A.block(7,0,3,7) = (J.data*arm_.getInertiaInverseMatrix().data).block(0,0,3,7);
   
   // TODO Param this ???
   double horizon_dt = 0.015;
@@ -328,12 +335,34 @@ void CartOptCtrl::updateHook(){
 //         ddq_upper[i] = fmin( ddq_upper[i], -current_jnt_vel[i] / tlim  ); // ddq <= dq^2 / (2(q-qmax))
 //   }
 
-  lbA = (( qd_min - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMax(
+  lbA.block(0,0,arm_.getNrOfJoints(),1) = (( qd_min - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMax(
       2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
   
-  ubA = (( qd_max - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMin(
+  ubA.block(0,0,arm_.getNrOfJoints(),1) = (( qd_max - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMin(
       2*(arm_.getJointUpperLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
   
+  Eigen::Matrix<double,6,1> lbA_cart, ubA_cart;
+  Eigen::VectorXd x_max, x_min;
+  x_max.setZero(6);
+  x_min.setZero(6);
+  x_max.block(0,0,3,1) = cart_max_constraints_;
+  x_min.block(0,0,3,1) = cart_min_constraints_;
+  
+//   x_max << 0.9, 0.5, 5.0, 10000,10000,10000;
+//   x_min << -0.6, -0.25, 0.4, -10000,-10000,-10000;
+  
+  Eigen::Matrix<double,6,1> xd_curr, x_curr;
+  Eigen::Matrix<double,3,1> x_curr_lin;
+  tf::twistKDLToEigen(Xd_curr_, xd_curr);
+//   x_curr << X_curr_.p(0), X_curr_.p(1), X_curr_.p(2), 10000,10000,10000;
+  tf::vectorKDLToEigen(X_curr_.p, x_curr_lin);
+  x_curr.block(0,0,3,1) = x_curr_lin;
+
+  ubA_cart = ((x_max - x_curr - horizon_dt * J.data * xd_curr)/(horizon_dt*horizon_dt) - jdot_qdot + J.data * M_inv.data *(coriolis.data + gravity.data)).block(0,0,3,1);
+  lbA_cart = ((x_min - x_curr - horizon_dt * J.data * xd_curr)/(horizon_dt*horizon_dt) - jdot_qdot + J.data * M_inv.data *(coriolis.data + gravity.data)).block(0,0,3,1);
+  
+  lbA.block(7,0,3,1) = lbA_cart;
+  ubA.block(7,0,3,1) = ubA_cart;
   
   // number of allowed compute steps
   int nWSR = 1e6; 
