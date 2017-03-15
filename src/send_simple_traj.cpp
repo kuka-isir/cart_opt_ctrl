@@ -24,10 +24,10 @@ int main(int argc, char** argv){
   waypoints.poses.push_back(curr_pos_msg);
 
   KDL::Frame curr_pos_kdl ;
-  tf::PoseMsgToKDL(curr_pos_msg,curr_pos_kdl );
+  tf::poseMsgToKDL(curr_pos_msg,curr_pos_kdl );
   //Do a rotation along a XYZ axis
   curr_pos_kdl.M.DoRotZ(-5.0*3.141519/180.0);
-  tf::PoseKDLToMsg(curr_pos_kdl ,curr_pos_msg);
+  tf::poseKDLToMsg(curr_pos_kdl ,curr_pos_msg);
   
   geometry_msgs::Pose pose;
   pose.position.x = -0.052;
