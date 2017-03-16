@@ -118,6 +118,7 @@ bool KDLTrajCompute::computeTrajectory(){
 
     // Add all the waypoints to the path
     KDL::Frame frame, previous_frame;
+    std::vector<KDL::Frame> waypoints;
     for(int i=0; i<waypoints_in_.poses.size(); i++){
       tf::poseMsgToKDL(waypoints_in_.poses[i], frame);
       // If the previous points is too similar dont add it
@@ -128,20 +129,26 @@ bool KDLTrajCompute::computeTrajectory(){
           continue;
         }
       }
-      path_->Add(frame);
+      waypoints.push_back(frame);
       previous_frame = frame;
     }
-    path_->Finish();
-    
-    // Set velocity profile of the trajectory
-    vel_profile_ = new KDL::VelocityProfile_Trap(vel_max_,acc_max_);
-    vel_profile_->SetProfile(0,path_->PathLength());
-    traject_ = new KDL::Trajectory_Segment(path_, vel_profile_);
 
     ctraject_ = new KDL::Trajectory_Composite();
     // Add a path only if there is at least 2 points
-    if(path_->GetNrOfSegments() > 0){
+    if(waypoints.size() > 1){
+      for(int i=0; i< waypoints.size(); i++)
+        path_->Add(waypoints[i]);
+      path_->Finish();
+      
+      // Set velocity profile of the trajectory
+      vel_profile_ = new KDL::VelocityProfile_Trap(vel_max_,acc_max_);
+      vel_profile_->SetProfile(0,path_->PathLength());
+      
+      traject_ = new KDL::Trajectory_Segment(path_, vel_profile_);
       ctraject_->Add(traject_);
+    }
+    else{
+      ctraject_->Add(new KDL::Trajectory_Segment(new KDL::Path_Point(frame), vel_profile_));
     }
     
     // Wait 0.5s at the end of the trajectory

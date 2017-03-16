@@ -11,6 +11,7 @@
 #include <kdl/velocityprofile_trap.hpp>
 #include <kdl/trajectory_composite.hpp>
 #include <kdl/path_roundedcomposite.hpp>
+#include <kdl/path_point.hpp>
 #include <kdl/framevel.hpp>
 #include <kdl/rotational_interpolation_sa.hpp>
 #include <kdl/trajectory_stationary.hpp>
