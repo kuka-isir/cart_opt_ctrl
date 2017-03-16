@@ -2,12 +2,11 @@ Operational Space Optimal Controller
 ============
 
 ### References
-1)
-```
-Control of robots sharing their workspace with humans: an energetic approach to safety
+[Control of robots sharing their workspace with humans: an energetic approach to safety](https://github.com/kuka-isir/cart_opt_ctrl/blob/master/papers/IROS2015_hal_01179822.pdf)
+
 A. Meguenani, V. Padois and P. Bidaud
 IROS, 2015.
-```
+
 Bibtex: 
 ```
 @inproceedings{meguenani_IROS2015,
@@ -22,12 +21,11 @@ Bibtex:
     address = {Hamburg, Germany}
 }
 ```
-2)
-```
-Energy based control for safe human-robot physical interaction
+[Energy based control for safe human-robot physical interaction](https://github.com/kuka-isir/cart_opt_ctrl/blob/master/papers/ISER2016_paper_133.pdf) 
+
 A. Meguenani, V. Padois, J. Da Silva, A. Hoarau, P. Bidaud
 International Symposium on Experimental Robotics, 2016
-```
+
 Bibtex:
 ```
 @incollection{meguenani:hal-01398790,
