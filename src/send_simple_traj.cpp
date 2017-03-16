@@ -11,7 +11,7 @@ int main(int argc, char** argv){
   ros::NodeHandle nh;
 
   geometry_msgs::PoseArray waypoints;
-  waypoints.header.frame_id = "link_0";
+  waypoints.header.frame_id = "base_link";
   waypoints.header.stamp = ros::Time::now();
 
   //Get current pose
@@ -20,32 +20,30 @@ int main(int argc, char** argv){
   pose_client.call(curr_pos);
 
   geometry_msgs::Pose curr_pos_msg = curr_pos.response.current_pose;
-
   waypoints.poses.push_back(curr_pos_msg);
-
-  KDL::Frame curr_pos_kdl ;
-  tf::poseMsgToKDL(curr_pos_msg,curr_pos_kdl );
-  //Do a rotation along a XYZ axis
-  curr_pos_kdl.M.DoRotZ(-5.0*3.141519/180.0);
-  tf::poseKDLToMsg(curr_pos_kdl ,curr_pos_msg);
   
   geometry_msgs::Pose pose;
-  pose.position.x = -0.052;
-  pose.position.y = -0.561;
-  pose.position.z = 0.420;
+  pose.position.x = 0.4;
+  pose.position.y = 0.0;
+  pose.position.z = 0.4;
   pose.orientation.x = -0.70711;
   pose.orientation.y = 0.70711;
   pose.orientation.z = 0.0;
   pose.orientation.w = 0.0;
   waypoints.poses.push_back(pose);
   
-  pose.position.x += 0.3;
   pose.position.y += 0.3;
   waypoints.poses.push_back(pose);
   
-  pose.position.x -= 0.4;
   pose.position.y -= 0.5;
   pose.position.z -= 0.1;
+  
+  KDL::Frame pos_kdl ;
+  tf::poseMsgToKDL(pose,pos_kdl );
+  //Do a rotation along a XYZ axis
+  pos_kdl.M.DoRotZ(-60.0*DEG2RAD);
+  tf::poseKDLToMsg(pos_kdl ,pose);
+  
   waypoints.poses.push_back(pose);
   
   ros::ServiceClient client = nh.serviceClient<cart_opt_ctrl::UpdateWaypoints>("/KDLTrajCompute/updateWaypoints");

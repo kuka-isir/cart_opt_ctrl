@@ -20,94 +20,27 @@ def main(argv):
     exit(0)
 
   waypoints = PoseArray()
-  waypoints.header.frame_id = "link_0"
+  waypoints.header.frame_id = "base_link"
+  
+  waypoints.poses.append(resp.current_pose)
   
   pose = Pose()
-  pose.position.x = -0.052
-  pose.position.y = -0.561
-  pose.position.z = 0.420
+  pose.position.x = 0.4
+  pose.position.y = 0.0
+  pose.position.z = 0.4
   pose.orientation.x = -0.70711
   pose.orientation.y = 0.70711
   pose.orientation.z = 0.0
   pose.orientation.w = 0.0
   waypoints.poses.append(pose)
 
-  pose2 = copy.deepcopy(pose)
-  pose2.position.x = 0.435
-  pose2.position.y = 0.24285015
-  pose2.position.z = 0.55
-  pose2.orientation.x = 0.70711
-  pose2.orientation.y = 0.70711
-  pose2.orientation.z = 0.0
-  pose2.orientation.w = 0.0
-
-  waypoints.poses.append(pose2)
   client = rospy.ServiceProxy('/KDLTrajCompute/updateWaypoints', UpdateWaypoints)
 
 
   req = UpdateWaypointsRequest();
   req.waypoints = waypoints;
 
-  rospy.loginfo("Calling /KDLTrajCompute/updateWaypoints service with the following waypoints :\n" + str(waypoints))
-  if client.call(req):
-    rospy.loginfo("Service call to /KDLTrajCompute/updateWaypoints succeedeed !")
-    #Repeat 3 times the same motion
-    for loop in range(0,3):
-      rospy.loginfo("loop :"+str(loop))
-      waypoints = PoseArray()
-      waypoints.header.frame_id = "table_link"
-
-      pose = Pose()
-      pose.position.x = 0.435
-      pose.position.y = 0.24285015
-      pose.position.z = 0.55
-      pose.orientation.x = 0.70711
-      pose.orientation.y = 0.70711
-      pose.orientation.z = 0.0
-      pose.orientation.w = 0.0
-      waypoints.poses.append(pose)
-
-      pose2 = copy.deepcopy(pose)
-      pose2.position.x = 0.435
-      pose2.position.y = -0.44285015
-      waypoints.poses.append(pose2)
-
-      client = rospy.ServiceProxy('/KDLTrajCompute/updateWaypoints', UpdateWaypoints)
-
-      req = UpdateWaypointsRequest();
-      req.waypoints = waypoints;
-
-      rospy.loginfo("Calling /KDLTrajCompute/updateWaypoints service with the following waypoints :\n" + str(waypoints))
-
-      if client.call(req):
-	rospy.loginfo("Service call to /KDLTrajCompute/updateWaypoints succeedeed !")
-	waypoints = PoseArray()
-	waypoints.header.frame_id = "table_link"
-
-	pose = Pose()
-	pose.position.x = 0.435
-	pose.position.y = -0.44285015
-	pose.position.z = 0.55
-	pose.orientation.x = 0.70711
-	pose.orientation.y = 0.70711
-	pose.orientation.z = 0.0
-	pose.orientation.w = 0.0
-	waypoints.poses.append(pose)
-
-	pose2 = copy.deepcopy(pose)
-	pose2.position.x = 0.435
-	pose2.position.y = 0.24285015
-	waypoints.poses.append(pose2)
-
-	client = rospy.ServiceProxy('/KDLTrajCompute/updateWaypoints', UpdateWaypoints)
-
-	req = UpdateWaypointsRequest();
-	req.waypoints = waypoints;
-
-	rospy.loginfo("Calling /KDLTrajCompute/updateWaypoints service with the following waypoints :\n" + str(waypoints))
-	client.call(req)
-      else:
-	rospy.logerror("Service call to /KDLTrajCompute/updateWaypoints failed !")
+  client.call(req)
 
 
 if __name__ == "__main__":
