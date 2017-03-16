@@ -140,7 +140,7 @@ bool KDLTrajCompute::computeTrajectory(){
 
     ctraject_ = new KDL::Trajectory_Composite();
     // Add a path only if there is at least 2 points
-    if(path_->GetNrOfSegments() > 1){
+    if(path_->GetNrOfSegments() > 0){
       ctraject_->Add(traject_);
     }
     
