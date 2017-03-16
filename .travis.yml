@@ -1,0 +1,23 @@
+sudo: required
+dist: trusty
+language: generic
+
+env:
+  global:
+    - UPSTREAM_WORKSPACE=https://raw.githubusercontent.com/kuka-isir/rtt_lwr/rtt_lwr-2.0/lwr_utils/config/rtt_lwr-full.rosinstall
+    - ROS_REPOSITORY_PATH=http://packages.ros.org/ros/ubuntu
+  matrix:
+    - ROS_DISTRO="indigo"
+    - ROS_DISTRO="jade"
+    - ROS_DISTRO="kinetic"
+
+matrix:
+  allow_failures:
+    - env: ROS_DISTRO="kinetic"
+
+install:
+  - git clone https://github.com/ros-industrial/industrial_ci.git .ci_config
+script:
+  - source .ci_config/travis.sh
+
+
