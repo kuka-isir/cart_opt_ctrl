@@ -124,7 +124,7 @@ bool KDLTrajCompute::computeTrajectory(){
       if(i>0){
         KDL::Twist err =  diff(frame, previous_frame);
         if((std::abs(err(0))<0.01) && (std::abs(err(1))<0.01) && (std::abs(err(2))<0.01)){
-          ROS_INFO_STREAM("Skipping point #"<<i<<"of the path");
+          ROS_WARN_STREAM("Skipping point #"<<i<<" of the path");
           continue;
         }
       }
@@ -138,9 +138,13 @@ bool KDLTrajCompute::computeTrajectory(){
     vel_profile_->SetProfile(0,path_->PathLength());
     traject_ = new KDL::Trajectory_Segment(path_, vel_profile_);
 
-    // Wait at the end of the trajectory
     ctraject_ = new KDL::Trajectory_Composite();
-    ctraject_->Add(traject_);
+    // Add a path only if there is at least 2 points
+    if(path_->GetNrOfSegments() > 1){
+      ctraject_->Add(traject_);
+    }
+    
+    // Wait 0.5s at the end of the trajectory
     ctraject_->Add(new KDL::Trajectory_Stationary(0.5,frame));
     
     // Publish a displayable path to ROS
