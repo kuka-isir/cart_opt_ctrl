@@ -6,6 +6,7 @@
 #include <rtt/InputPort.hpp>
 #include <rtt/OutputPort.hpp>
 #include <memory>
+#include <rtt_ros_kdl_tools/tools.hpp>
 
 #include <kdl/velocityprofile_trap.hpp>
 #include <kdl/trajectory_composite.hpp>

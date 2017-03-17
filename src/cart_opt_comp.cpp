@@ -262,7 +262,8 @@ void CartOptCtrl::updateHook(){
     log(RTT::Warning) << "Trajectory ports empty !" << endlog();
     return;
   }
-  target << X_traj_.p.x() , X_traj_.p.y() ,0.0;
+  target << X_traj_.p.x() ,0.0 ,0.0;
+  //target << X_traj_.p.x() , X_traj_.p.y() ,0.0;
   KDL::Frame link_6_pos = arm_.getSegmentPosition(link_6_frame);
   frame_target = Frame(Rotation::RPY(0.0,0.0,0.0),Vector(target(0),target(1),target(2)));
   KDL::Rotation rotz = PointTarget(frame_target,X_curr_);

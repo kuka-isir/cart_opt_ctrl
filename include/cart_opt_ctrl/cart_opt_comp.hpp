@@ -90,7 +90,7 @@ class CartOptCtrl : public RTT::TaskContext{
     bool compensate_gravity_;
     bool perturbation,inc;
     int number_of_constraints;
-    string link_6_frame;
+    std::string link_6_frame;
     Eigen::VectorXd p_gains_, d_gains_, i_gains_, torque_max_, jnt_vel_max_;
     Eigen::VectorXd target;
     std::vector<Eigen::VectorXd> select_components_, select_axes_;

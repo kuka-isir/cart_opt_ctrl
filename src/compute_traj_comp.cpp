@@ -23,7 +23,7 @@ KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
   this->addProperty("radius",radius_).doc("Radius for path roundness");
   this->addProperty("eqradius",eqradius_).doc("Equivalent radius for path roundness");
   
-
+  rtt_ros_kdl_tools::getAllPropertiesFromROSParam(this);
   
   interpolator_ = new KDL::RotationalInterpolation_SingleAxis();
 }
@@ -59,6 +59,7 @@ bool KDLTrajCompute::updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& re
 bool KDLTrajCompute::configureHook(){ 
   current_traj_time_ = 0.0;
   traj_computed_ = false;
+
   return true;
 }
 
@@ -110,7 +111,7 @@ bool KDLTrajCompute::computeTrajectory(){
     // Wait at the end of the trajectory
     ctraject_ = new KDL::Trajectory_Composite();
     ctraject_->Add(traject_);
-    ctraject_->Add(new KDL::Trajectory_Stationary(0.5,frame));
+    ctraject_->Add(new KDL::Trajectory_Stationary(0.1,frame));
     
     // Publish a displayable path to ROS
     publishTrajectory();

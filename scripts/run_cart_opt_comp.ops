@@ -29,6 +29,18 @@ setActivity("CartOptCtrl",0.001,LowestPriority,ORO_SCHED_RT)
 loadService("CartOptCtrl","rosservice")
 CartOptCtrl.rosservice.connect("getCurrentPose","/CartOptCtrl/getCurrentPose","cart_opt_ctrl/GetCurrentPose")
 
+import("rtt_dynamic_reconfigure")
+loadService("KDLTrajCompute", "reconfigure")
+KDLTrajCompute.reconfigure.min.vel_max = 0.0
+KDLTrajCompute.reconfigure.max.vel_max = 0.5
+KDLTrajCompute.reconfigure.min.acc_max = 0.0
+KDLTrajCompute.reconfigure.max.acc_max = 3.0
+KDLTrajCompute.reconfigure.min.radius = 0.0
+KDLTrajCompute.reconfigure.max.radius = 0.04
+KDLTrajCompute.reconfigure.min.eqradius = 0.0
+KDLTrajCompute.reconfigure.max.eqradius = 0.1
+KDLTrajCompute.reconfigure.advertise("/KDLTrajCompute")
+
 // Connect controller
 connectPeers("CartOptCtrl",getRobotName())
 connectStandardPorts("CartOptCtrl",getRobotName(),ConnPolicy())
