@@ -166,10 +166,8 @@ void CartOptCtrl::updateHook(){
       
     has_first_command_ = true;
   }
-  else{
+  else
     log(RTT::Warning) << "Trajectory ports empty !" << endlog();
-    return;
-  }
   
   // First step, initialise the first X,Xd,Xdd desired
   if(!has_first_command_){
