@@ -58,8 +58,11 @@ catkin_package(
 ## ROS control and trajectory nodes
 add_executable(kdl_trajectory_sender src/kdl_trajectory_sender.cpp)
 target_link_libraries(kdl_trajectory_sender ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
 add_library(cart_opt_controllers src/cart_opt_controller.cpp)
 target_link_libraries(cart_opt_controllers ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+add_dependencies(cart_opt_controllers ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
+
 add_executable(send_simple_traj src/send_simple_traj.cpp)
 target_link_libraries(send_simple_traj ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
