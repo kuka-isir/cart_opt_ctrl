@@ -1,6 +1,6 @@
 Operational Space Optimal Controller
 ============
-
+[![Build Status](https://travis-ci.org/kuka-isir/cart_opt_ctrl.svg?branch=master)](https://travis-ci.org/kuka-isir/cart_opt_ctrl)
 ### References
 [Control of robots sharing their workspace with humans: an energetic approach to safety](https://github.com/kuka-isir/cart_opt_ctrl/blob/master/papers/IROS2015_hal_01179822.pdf)
 
