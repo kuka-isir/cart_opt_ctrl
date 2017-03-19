@@ -69,6 +69,7 @@ target_link_libraries(send_simple_traj ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 ## Orocos control and trajectory components
 orocos_component(${PROJECT_NAME} src/cart_opt_comp.cpp src/compute_traj_comp.cpp src/impulse_cart_comp.cpp)
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMPONENT)
+add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 
 target_link_libraries(${PROJECT_NAME}
    ${catkin_LIBRARIES}
