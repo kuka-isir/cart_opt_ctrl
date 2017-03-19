@@ -31,7 +31,9 @@
   <build_depend>qpOASES</build_depend>
   <build_depend>tf</build_depend>
   <build_depend>message_generation</build_depend>
+  <build_depend>joint_trajectory_controller</joint_trajectory_controller>
 
+  <run_depend>joint_trajectory_controller</run_depend>
   <run_depend>rtt_ros_kdl_tools</run_depend>
   <run_depend>rtt_roscomm</run_depend>
   <run_depend>rtt_rosparam</run_depend>

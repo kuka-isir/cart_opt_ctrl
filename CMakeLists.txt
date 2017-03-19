@@ -23,6 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
     message_generation
     geometry_msgs
     tf
+    joint_trajectory_controller
 )
 
 
