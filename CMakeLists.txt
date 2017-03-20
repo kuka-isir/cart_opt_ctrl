@@ -64,6 +64,7 @@ target_link_libraries(cart_opt_controllers ${catkin_LIBRARIES} ${Boost_LIBRARIES
 add_dependencies(cart_opt_controllers ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 
 add_executable(send_simple_traj src/send_simple_traj.cpp)
+add_dependencies(send_simple_traj ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(send_simple_traj ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 ## Orocos control and trajectory components
