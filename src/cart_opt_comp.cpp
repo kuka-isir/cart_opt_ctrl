@@ -352,8 +352,8 @@ void CartOptCtrl::updateHook(){
   tf::vectorKDLToEigen(X_curr_.p, x_curr_lin);
   x_curr.block(0,0,3,1) = x_curr_lin;
 
-  ubA_cart = (2*(x_max - x_curr - horizon_dt * J.data * xd_curr)/(horizon_dt*horizon_dt) - jdot_qdot + J.data * M_inv.data *(coriolis.data + gravity.data)).block(0,0,3,1);
-  lbA_cart = (2*(x_min - x_curr - horizon_dt * J.data * xd_curr)/(horizon_dt*horizon_dt) - jdot_qdot + J.data * M_inv.data *(coriolis.data + gravity.data)).block(0,0,3,1);
+  ubA_cart = (2*(x_max - x_curr - horizon_dt * J.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot + J.data * M_inv.data *(coriolis.data + gravity.data)).block(0,0,3,1);
+  lbA_cart = (2*(x_min - x_curr - horizon_dt * J.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot + J.data * M_inv.data *(coriolis.data + gravity.data)).block(0,0,3,1);
   
   lbA.block(7,0,3,1) = lbA_cart;
   ubA.block(7,0,3,1) = ubA_cart;
