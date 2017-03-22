@@ -47,9 +47,8 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::InputPort<KDL::Twist> port_pnt_acc_in_;
     RTT::InputPort<Eigen::VectorXd> port_joint_position_in_;
     RTT::InputPort<Eigen::VectorXd> port_joint_velocity_in_;
-    RTT::InputPort<std_msgs::Bool> port_button_pressed_in_;
+    RTT::InputPort<bool> port_button_pressed_in_;
     
-    std_msgs::Bool button_pressed_msg_;
     bool button_pressed_;
 
     // Chain chain_utils

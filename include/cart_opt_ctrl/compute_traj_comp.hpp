@@ -48,9 +48,9 @@ class KDLTrajCompute : public RTT::TaskContext{
     RTT::OutputPort<geometry_msgs::PoseArray> port_pose_array_out_;
     
     // Input ports
-    RTT::InputPort<std_msgs::Bool> port_button_pressed_in_;
+    RTT::InputPort<bool> port_button_pressed_in_;
     
-    std_msgs::Bool button_pressed_msg_;
+    bool button_pressed_;
     geometry_msgs::PoseArray waypoints_in_;
     KDL::Frame current_pos_;
     KDL::Twist current_vel_, current_acc_;

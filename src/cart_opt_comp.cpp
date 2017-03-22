@@ -261,9 +261,7 @@ void CartOptCtrl::updateHook(){
     g = - 2.0* (regularisation * (gravity.data - damping* joint_velocity_in_));
   
   // Read button press port
-  if(this->port_button_pressed_in_.read(button_pressed_msg_) != RTT::NoData){
-    button_pressed_ = button_pressed_msg_.data;
-  }
+  this->port_button_pressed_in_.read(button_pressed_);
   
   // If button is pressed leave only the regularisation task
   // Then progressively introduce the cartesian task

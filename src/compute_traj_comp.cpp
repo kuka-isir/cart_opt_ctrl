@@ -33,6 +33,8 @@ KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
   
   interpolator_ = new KDL::RotationalInterpolation_SingleAxis();
   tf_ = new tf::TransformListener();
+  
+  button_pressed_ = false;
 }
 
 bool KDLTrajCompute::updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& req, cart_opt_ctrl::UpdateWaypoints::Response& resp){  
@@ -62,9 +64,9 @@ bool KDLTrajCompute::updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& re
   
   while(traj_computed_){
     // Read button press port
-    if(this->port_button_pressed_in_.read(button_pressed_msg_) != RTT::NoData){
+    if(this->port_button_pressed_in_.read(button_pressed_) != RTT::NoData){
       // If gravity compensation activated, return failure on service
-      if (button_pressed_msg_.data){
+      if (button_pressed_){
         current_traj_time_ = 0.0;
         traj_computed_ = false;
         resp.success = false;
