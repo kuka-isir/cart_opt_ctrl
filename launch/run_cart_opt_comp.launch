@@ -33,6 +33,8 @@
   <!-- Tools -->
   <arg name="load_base" default="true" />
   <arg name="load_table" default="true" />
+  <arg name="load_laser" default="false" />
+  <arg name="load_weight" default="false" />
   <arg name="load_ati_sensor" default="true" />
   <arg name="load_handle" default="true" />
   <arg name="load_calib_tool" default="false" />
@@ -43,28 +45,31 @@
   
 <!--============ CartOptCtrl Params ============-->
   <rosparam ns="CartOptCtrl" subst_value="true">
-    torque_max : [170.0, 170.0, 95.0, 95.0, 95.0, 32.0, 32.0]
+    torque_max : [160.0, 160.0, 85.0, 85.0, 85.0, 28.0, 28.0]
     joint_vel_max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
   
         <!--PD-->
-<!--    p_gains : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
-    d_gains : [12.0, 12.0, 12.0, 12.0, 12.0, 12.0]
+<!--    p_gains : [1080.0, 1080.0, 1080.0, 3500.0, 3500.0, 3500.0]
+    d_gains : [12.0, 12.0, 12.0, 30.0, 30.0, 30.0]
     i_gains : [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     integral_saturation : 0-->
     
 
     <!--PID-->
-    p_gains : [840.0, 840.0, 840.0, 3600.0, 3600.0, 3600.0]
-    d_gains : [27.3, 27.3, 27.3, 12.4, 12.4, 12.4]
-    i_gains : [6.4610, 6.4610, 6.4610, 5.0, 5.0, 5.0]
-    integral_saturation : 1
-
-    position_saturation : 0.03
-    orientation_saturation : 0.09
-    Ec_lim : 0.2
+    p_gains : [3000.0, 3000.0, 3000.0, 4500.0, 4500.0, 4500.0] 
+    <!--p_gains : [840.0, 840.0, 840.0, 3600.0, 3600.0, 3600.0]-->
+    d_gains : [27.3, 27.3, 27.3, 22.4, 22.4, 22.4]
+    i_gains : [6.4610, 6.4610, 6.4610, 25.0, 25.0, 25.0]
+    integral_pos_saturation : 1
+    integral_ori_saturation : 50
+    position_saturation : 0.01
+    orientation_saturation : 0.03
+    Ec_lim : .35
+    F_lim : 75
     horizon : 15
     regularisation_weight : [0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001]
     compensate_gravity : true
+    static_pointing : false
     damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
     frame_of_interest : "ati_link"
     select_components_0 : [1,1,1,1,1,1]
@@ -83,7 +88,7 @@
   
 <!--============ KDLTrajCompute Params ============-->
   <rosparam ns="KDLTrajCompute" subst_value="true">
-    vel_max : 1.0
+    vel_max : 0.25
     acc_max : 2.0
     radius : 0.01
     eqradius : 0.05
@@ -101,7 +106,9 @@
     <arg name="log_level" value="$(arg log_level)" />
     <arg name="tip_link" value="$(arg tip_link)"/>
     <arg name="load_base" value="$(arg load_base)" />
+    <arg name="load_weight" value="$(arg load_weight)" />
     <arg name="load_table" value="$(arg load_table)" />
+    <arg name="load_laser" value="$(arg load_laser)" />
     <arg name="load_ati_sensor" value="$(arg load_ati_sensor)" />
     <arg name="load_calib_tool" value="$(arg load_calib_tool)" />
     <arg name="load_handle" value="$(arg load_handle)" />

@@ -18,6 +18,7 @@
 #include <kdl/utilities/error.h>
 
 #include <tf_conversions/tf_kdl.h>
+#include <unsupported/Eigen/MatrixFunctions>
 
 #include <geometry_msgs/PoseArray.h>
 #include <nav_msgs/Path.h>

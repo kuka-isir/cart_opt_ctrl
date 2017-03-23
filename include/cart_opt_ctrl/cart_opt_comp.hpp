@@ -11,6 +11,12 @@
 #include <qpOASES.hpp>
 #include <memory>
 
+// Actions Clients !!
+#include <krl_msgs/LINAction.h>
+#include <krl_msgs/PTPAction.h>
+#include <actionlib/client/simple_action_client.h>
+#include <actionlib/client/terminal_state.h>
+
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
@@ -37,6 +43,7 @@ class CartOptCtrl : public RTT::TaskContext{
     void stopHook();
     
     bool getCurrentPose(cart_opt_ctrl::GetCurrentPose::Request& req, cart_opt_ctrl::GetCurrentPose::Response& resp);
+    bool getPointingPose(cart_opt_ctrl::GetCurrentPose::Request& req, cart_opt_ctrl::GetCurrentPose::Response& resp);
     KDL::Rotation PointTarget(KDL::Frame frame_target, KDL::Frame frame_des);
     double KineticEnergy();
     Eigen::Matrix<double,2,1> GetPointingTarget(KDL::Frame frame,KDL::Frame frame_target);
@@ -44,7 +51,7 @@ class CartOptCtrl : public RTT::TaskContext{
   protected:
     // Output ports
     RTT::OutputPort<Eigen::VectorXd> port_joint_torque_out_;
-    RTT::OutputPort<geometry_msgs::PoseStamped> port_x_des_,port_x_mes_;
+    RTT::OutputPort<geometry_msgs::PoseStamped> port_x_des_,port_x_mes_,port_x_target_;
     RTT::OutputPort<trajectory_msgs::JointTrajectoryPoint> port_joint_pos_vel_in_; 
     RTT::OutputPort<geometry_msgs::Twist> port_error_out_,port_Xd_out_,port_Xd_out_const_,port_xdd_des_,port_xdd_des_const_; 
     
@@ -64,27 +71,29 @@ class CartOptCtrl : public RTT::TaskContext{
     Eigen::VectorXd joint_torque_out_,
                     joint_position_in_,
                     joint_velocity_in_;
-    
+		    
 
     KDL::Frame pt_pos_in_;
     KDL::Twist pt_vel_in_, pt_acc_in_;
     
     std::string ee_frame_;
     bool has_first_command_ = false;
-
+    bool static_pointing,point_to_target;
+    KDL::Rotation rotz ;
     KDL::Frame X_traj_,X_curr_,frame_target;
     KDL::Twist X_err_,Xd_err_,Xdd_err_;
     KDL::Twist Xd_curr_,Old_xd_curr_,Xdd_curr_,Xd_traj_,Xdd_traj_;
     KDL::Twist Old_xdd_des,Xdd_des;
     
     KDL::Twist integral_term,integral_term_sat;
-    double integral_saturation; 
+    double integral_pos_saturation,integral_ori_saturation; 
     
     bool rotation;
     
     Eigen::VectorXd regularisation_weight_, damping_weight_;
+    Eigen::Matrix<double,6,6> button_selection;
     double transition_gain_;
-    double Ec_lim;
+    double Ec_lim , F_lim;
     double horizon;
     double position_saturation_, orientation_saturation_;
     bool compensate_gravity_;
@@ -104,11 +113,11 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::OutputPort<std_msgs::Float64MultiArray> port_delta_x_info,
 						 port_force_info;
 						 
-    std_msgs::Float64MultiArray Ec_constraints_msg,kd_x_err_msg,Xdd_out_msg;
-    RTT::OutputPort<std_msgs::Float64MultiArray> port_Ec_constraints,port_kd_x_err,port_Xdd_out;
+    std_msgs::Float64MultiArray Ec_constraints_msg,kp_x_err_msg,Xdd_out_msg;
+    RTT::OutputPort<std_msgs::Float64MultiArray> port_Ec_constraints,port_kp_x_err,port_Xdd_out;
     
-    std_msgs::Float64 positioning_error,pointing_error;
-    RTT::OutputPort<std_msgs::Float64> port_positioning_error,port_pointing_error;
+    std_msgs::Float64 positioning_error,pointing_error,Ec_constraint2;
+    RTT::OutputPort<std_msgs::Float64> port_positioning_error,port_pointing_error,port_Ec_constraint2;
     
     RTT::OutputPort< geometry_msgs::Twist> port_integral_term;
     

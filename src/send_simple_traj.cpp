@@ -4,14 +4,14 @@
 #include <kdl_conversions/kdl_msg.h>
 #include <cart_opt_ctrl/UpdateWaypoints.h>
 #include <cart_opt_ctrl/GetCurrentPose.h>
-#define DEG2RAD 3.141592653589793/180
+#define DEG2RAD 3.141592653589793/180.0
 
 int main(int argc, char** argv){
   ros::init(argc, argv, "send_simple_traj");
   ros::NodeHandle nh;
 
   geometry_msgs::PoseArray waypoints;
-  waypoints.header.frame_id = "link_0";
+  waypoints.header.frame_id = "base_link";
   waypoints.header.stamp = ros::Time::now();
 
   //Get current pose
@@ -26,7 +26,8 @@ int main(int argc, char** argv){
   KDL::Frame curr_pos_kdl ;
   tf::PoseMsgToKDL(curr_pos_msg,curr_pos_kdl );
   //Do a rotation along a XYZ axis
-  curr_pos_kdl.M.DoRotX(2.0/100.0);
+  curr_pos_kdl.M.DoRotZ(90.0*DEG2RAD);
+//   curr_pos_kdl.p.x(curr_pos_kdl.p.x()+0.1);
   tf::PoseKDLToMsg(curr_pos_kdl ,curr_pos_msg);
   
   waypoints.poses.push_back(curr_pos_msg);

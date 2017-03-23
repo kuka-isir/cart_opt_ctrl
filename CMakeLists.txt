@@ -22,6 +22,7 @@ find_package(catkin REQUIRED COMPONENTS
     controller_manager
     message_generation
     geometry_msgs
+    krl_msgs
 )
 
 
