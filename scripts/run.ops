@@ -67,6 +67,7 @@ stream("CartOptCtrl.Integral_term",ros.comm.topic("CartOptCtrl/Integral_term"))
 stream("CartOptCtrl.kp_x_err",ros.comm.topic("CartOptCtrl/kp_x_err"))
 stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
 stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
+stream("CartOptCtrl.JointTorqueInfo",ros.comm.topic("CartOptCtrl/JointTorqueInfo"))
 stream("CartOptCtrl.ButtonPressed",ros.comm.topic("activate_gravity"))
 
 

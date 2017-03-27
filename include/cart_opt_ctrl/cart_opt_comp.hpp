@@ -53,7 +53,7 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::OutputPort<Eigen::VectorXd> port_joint_torque_out_;
     RTT::OutputPort<geometry_msgs::PoseStamped> port_x_des_,port_x_mes_,port_x_target_;
     RTT::OutputPort<trajectory_msgs::JointTrajectoryPoint> port_joint_pos_vel_in_; 
-    RTT::OutputPort<geometry_msgs::Twist> port_error_out_,port_Xd_out_,port_Xd_out_const_,port_xdd_des_,port_xdd_des_const_; 
+    RTT::OutputPort<geometry_msgs::Twist> port_error_out_,port_Xd_out_,port_Xd_out_const_,port_xdd_des_;
     
     // Input ports
     RTT::InputPort<KDL::Frame> port_pnt_pos_in_;
@@ -102,6 +102,11 @@ class CartOptCtrl : public RTT::TaskContext{
     std::string link_6_frame;
     Eigen::VectorXd p_gains_, d_gains_, i_gains_, torque_max_, jnt_vel_max_;
     Eigen::VectorXd target;
+
+    Eigen::VectorXd a_butter,b_butter;
+    Eigen::Matrix<double,6,6> filtered_vel,filtered_acc,old_vel,old_acc;
+    Eigen::Matrix<double,6,1> Xdd_filtered, X_curr_filtered;
+
     std::vector<Eigen::VectorXd> select_components_, select_axes_;
 
     std::unique_ptr<qpOASES::SQProblem> qpoases_solver_;
@@ -113,8 +118,8 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::OutputPort<std_msgs::Float64MultiArray> port_delta_x_info,
 						 port_force_info;
 						 
-    std_msgs::Float64MultiArray Ec_constraints_msg,kp_x_err_msg,Xdd_out_msg;
-    RTT::OutputPort<std_msgs::Float64MultiArray> port_Ec_constraints,port_kp_x_err,port_Xdd_out;
+    std_msgs::Float64MultiArray Ec_constraints_msg,kp_x_err_msg,Xdd_out_msg,xdd_des_const_float_msg;
+    RTT::OutputPort<std_msgs::Float64MultiArray> port_Ec_constraints,port_kp_x_err,port_Xdd_out,port_joint_torque_,port_xdd_des_const_;
     
     std_msgs::Float64 positioning_error,pointing_error,Ec_constraint2;
     RTT::OutputPort<std_msgs::Float64> port_positioning_error,port_pointing_error,port_Ec_constraint2;

@@ -68,7 +68,7 @@
       position_saturation : 0.01
       orientation_saturation : 0.03
       Ec_lim : .35
-      F_lim : 75
+      F_lim : 40
       horizon : 15
       regularisation_weight : [0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001]
       compensate_gravity : true
