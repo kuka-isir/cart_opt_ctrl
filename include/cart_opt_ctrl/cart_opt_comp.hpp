@@ -49,6 +49,37 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::InputPort<Eigen::VectorXd> port_joint_velocity_in_;
     RTT::InputPort<bool> port_button_pressed_in_;
     
+    KDL::Jacobian J_;
+    KDL::JntSpaceInertiaMatrix M_inv_;
+    KDL::JntArray coriolis_;
+    KDL::JntArray gravity_;
+    KDL::Twist Jdotqdot_;
+    Eigen::Matrix<double,6,1> jdot_qdot_;
+    Eigen::Matrix<double,6,1> xdd_des_;
+    Eigen::MatrixXd regularisation_;
+    Eigen::MatrixXd damping_;
+    
+    // Matrices for qpOASES
+    // NOTE: We need RowMajor (see qpoases doc)
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> H_;
+    Eigen::VectorXd g_;
+    Eigen::Matrix<double,6,Eigen::Dynamic> a_;
+    Eigen::Matrix<double,6,1> b_;
+    Eigen::MatrixXd select_axis_, select_cartesian_component_;
+    Eigen::VectorXd lb_, ub_;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A_;
+    Eigen::VectorXd lbA_, ubA_, qd_min_, qd_max_;
+    Eigen::VectorXd nonLinearTerms_;
+    Eigen::VectorXd x_max_, x_min_;
+    Eigen::Matrix<double,6,1> xd_curr_, x_curr_;
+    Eigen::Matrix<double,3,1> x_curr_lin_;
+    
+    // For ROS debug
+    geometry_msgs::Pose x_des_pos_out_;
+    geometry_msgs::PoseStamped x_des_pos_stamped_out_;
+    trajectory_msgs::JointTrajectoryPoint joint_pos_vel_;
+    geometry_msgs::Twist error_twist_ros_;
+    
     bool button_pressed_;
 
     // Chain chain_utils
@@ -67,7 +98,7 @@ class CartOptCtrl : public RTT::TaskContext{
     KDL::Frame X_traj_,X_curr_;
     KDL::Twist X_err_,Xd_err_,Xdd_err_;
     KDL::Twist Xd_curr_,Xdd_curr_,Xd_traj_,Xdd_traj_;
-    KDL::Twist Xdd_des;
+    KDL::Twist Xdd_des_;
     
     Eigen::VectorXd damping_weight_, cart_min_constraints_, cart_max_constraints_;
     double transition_gain_, regularisation_weight_, horizon_steps_;

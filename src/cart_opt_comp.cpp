@@ -61,7 +61,7 @@ bool CartOptCtrl::configureHook(){
   // The number of joints
   const int dof = arm_.getNrOfJoints();
   
-  // Resize the vectors
+  // Resize the vectors and matrices
   p_gains_.resize(6);
   d_gains_.resize(6);
   torque_max_.resize(dof);
@@ -76,6 +76,19 @@ bool CartOptCtrl::configureHook(){
   joint_torque_out_.setZero(dof);
   joint_position_in_.setZero(dof);
   joint_velocity_in_.setZero(dof);
+  H_.resize(dof,dof);  
+  g_.resize(dof);
+  a_.resize(6,dof);
+  lb_.resize(dof);
+  ub_.resize(dof);
+  A_.resize(number_of_constraints_,dof);
+  lbA_.resize(number_of_constraints_);
+  ubA_.resize(number_of_constraints_);
+  qd_min_.resize(dof);
+  qd_max_.resize(dof);
+  nonLinearTerms_.resize(dof);
+  x_max_.setZero(6);
+  x_min_.setZero(6);
   
   // Default params
   ee_frame_ = arm_.getSegmentName( arm_.getNrOfSegments() - 1 );
@@ -128,12 +141,11 @@ bool CartOptCtrl::startHook(){
   // Initialize start values
   has_first_command_ = false;
   button_pressed_ = false;
-  transition_gain_ = 1.0;
-  
+  transition_gain_ = 1.0;   
   return true;
 }
 
-void CartOptCtrl::updateHook(){  
+void CartOptCtrl::updateHook(){
   // Read the current state of the robot
   RTT::FlowStatus fp = this->port_joint_position_in_.read(this->joint_position_in_);
   RTT::FlowStatus fv = this->port_joint_velocity_in_.read(this->joint_velocity_in_);
@@ -180,23 +192,23 @@ void CartOptCtrl::updateHook(){
   X_err_ = diff( X_curr_ , X_traj_ );
   Xd_err_ = diff( Xd_curr_ , Xd_traj_);
   
-  // Debug publish in ROS
-  geometry_msgs::Pose x_des_pos_out;
-  tf::poseKDLToMsg(X_traj_,x_des_pos_out);
-  geometry_msgs::PoseStamped x_des_pos_stamped_out;
-  x_des_pos_stamped_out.pose = x_des_pos_out;
-  x_des_pos_stamped_out.header.frame_id = base_frame_;
-  x_des_pos_stamped_out.header.stamp = rtt_rosclock::host_now();
-  port_x_des_.write(x_des_pos_stamped_out);
-  trajectory_msgs::JointTrajectoryPoint joint_pos_vel;
+  // Debug publish current pose in ROS
+  tf::poseKDLToMsg(X_traj_,x_des_pos_out_);
+  x_des_pos_stamped_out_.pose = x_des_pos_out_;
+  x_des_pos_stamped_out_.header.frame_id = base_frame_;
+  x_des_pos_stamped_out_.header.stamp = rtt_rosclock::host_now();
+  port_x_des_.write(x_des_pos_stamped_out_);
+  
+  // Debug publish current position and velocity in ROS
   for(int i=0; i< arm_.getNrOfJoints(); i++){
-    joint_pos_vel.positions.push_back(joint_position_in_(i));
-    joint_pos_vel.velocities.push_back(joint_velocity_in_(i));
+    joint_pos_vel_.positions.push_back(joint_position_in_(i));
+    joint_pos_vel_.velocities.push_back(joint_velocity_in_(i));
   }
-  port_joint_pos_vel_in_.write(joint_pos_vel);
-  geometry_msgs::Twist error_twist_ros;
-  tf::twistKDLToMsg(X_err_, error_twist_ros);
-  port_error_out_.write(error_twist_ros);
+  port_joint_pos_vel_in_.write(joint_pos_vel_);
+  
+  // Debug publish pose error in ROS
+  tf::twistKDLToMsg(X_err_, error_twist_ros_);
+  port_error_out_.write(error_twist_ros_);
   
   // Saturate the pose error
   for(unsigned int i=0; i<3; ++i ){
@@ -214,23 +226,20 @@ void CartOptCtrl::updateHook(){
   
   // Apply PD 
   for( unsigned int i=0; i<6; ++i )
-    Xdd_des(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) - d_gains_(i) * ( Xd_curr_(i) );
+    Xdd_des_(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) - d_gains_(i) * ( Xd_curr_(i) );
+  tf::twistKDLToEigen(Xdd_des_,xdd_des_);
   
-  Eigen::Matrix<double,6,1> xdd_des;
-  tf::twistKDLToEigen(Xdd_des,xdd_des);
-      
-  KDL::Jacobian& J = arm_.getSegmentJacobian(ee_frame_);
-  
-  KDL::JntSpaceInertiaMatrix& M_inv = arm_.getInertiaInverseMatrix();
-  
-  KDL::JntArray& coriolis = arm_.getCoriolisTorque();
-  
-  KDL::JntArray& gravity = arm_.getGravityTorque();
-  
-  KDL::Twist& Jdotqdot = arm_.getSegmentJdotQdot(ee_frame_);
-  
-  Eigen::Matrix<double,6,1> jdot_qdot;
-  tf::twistKDLToEigen(Jdotqdot,jdot_qdot);
+  // Update current Matrices and vectors
+  J_ = arm_.getSegmentJacobian(ee_frame_);
+  M_inv_ = arm_.getInertiaInverseMatrix();
+  coriolis_ = arm_.getCoriolisTorque();
+  gravity_ = arm_.getGravityTorque();
+  Jdotqdot_ = arm_.getSegmentJdotQdot(ee_frame_);
+  tf::twistKDLToEigen(Jdotqdot_,jdot_qdot_);
+  nonLinearTerms_ = arm_.getInertiaInverseMatrix().data * ( coriolis_.data + gravity_.data );
+  tf::twistKDLToEigen(Xd_curr_, xd_curr_);
+  tf::vectorKDLToEigen(X_curr_.p, x_curr_lin_);
+  x_curr_.block(0,0,3,1) = x_curr_lin_;
   
   // We put it in the form ax + b
   // M(q).qdd + B(qd) + G(q) = T
@@ -240,25 +249,20 @@ void CartOptCtrl::updateHook(){
   // --> Xdd = Jdot.qdot + J.Minv.( T - B - G)
   // --> Xdd = Jdot.qdot + J.Minv.T - J.Minv.( B + G )
   // And we have Xdd_des = Xdd_traj_ + p_gains_.( X_des - X_curr_) + d_gains_.( Xd_des - Xd_curr_)
-  // ==> We want to compute min(T) || Xdd - Xdd_des ||Â²
+  // ==> We want to compute min(T) || Xdd - Xdd_des ||²
   // If with replace, we can put it in the form ax + b
-  // With a = 00001J.Minv
+  // With a = J.Minv
   //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
 
-  Eigen::MatrixXd regularisation = regularisation_weight_* M_inv.data;
-  Eigen::MatrixXd damping = damping_weight_.asDiagonal();
-  
-  // Matrices for qpOASES
-  // NOTE: We need RowMajor (see qpoases doc)
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> H;
-  H.resize(arm_.getNrOfJoints(),arm_.getNrOfJoints());  
-  Eigen::VectorXd g(arm_.getNrOfJoints());
-  
+  // Update regularisation weights 
+  regularisation_ = regularisation_weight_* M_inv_.data;
+  damping_ = damping_weight_.asDiagonal();
+
   // Regularisation task
   // Can be tau, tau-g or tau-g-b*qdot
-  H = 2.0 * regularisation;
+  H_ = 2.0 * regularisation_;
   if (compensate_gravity_)
-    g = - 2.0* (regularisation * (gravity.data - damping* joint_velocity_in_));
+    g_ = - 2.0* (regularisation_* (gravity_.data - damping_* joint_velocity_in_));
   
   // Read button press port
   this->port_button_pressed_in_.read(button_pressed_);
@@ -271,45 +275,32 @@ void CartOptCtrl::updateHook(){
     transition_gain_ = std::min(1.0,transition_gain_ + 0.001 * regularisation_weight_);
   
   // Write cartesian tasks
-  // The cartesian tasks can be decoupling by axes
-  Eigen::Matrix<double,6,Eigen::Dynamic> a;
-  a.resize(6,arm_.getNrOfJoints());
-  Eigen::Matrix<double,6,1> b;
-  Eigen::MatrixXd select_axis, select_cartesian_component;
+  // The cartesian tasks can be decoupling by axes  
   for(int i=0; i<select_components_.size();i++){
-    select_axis = select_axes_[i].asDiagonal();
-    select_cartesian_component = select_components_[i].asDiagonal();
+    select_axis_ = select_axes_[i].asDiagonal();
+    select_cartesian_component_ = select_components_[i].asDiagonal();
     
-    a.noalias() =  J.data * select_axis * M_inv.data;
-    b.noalias() = (- a * ( coriolis.data + gravity.data ) + jdot_qdot - xdd_des);
+    a_.noalias() =  J_.data * select_axis_ * M_inv_.data;
+    b_.noalias() = (- a_ * ( coriolis_.data + gravity_.data ) + jdot_qdot_ - xdd_des_);
     
-    H += transition_gain_ * 2.0 * a.transpose() * select_cartesian_component * a;  
-    g += transition_gain_ * 2.0 * a.transpose() * select_cartesian_component * b;
+    H_ += transition_gain_ * 2.0 * a_.transpose() * select_cartesian_component_ * a_;  
+    g_ += transition_gain_ * 2.0 * a_.transpose() * select_cartesian_component_ * b_;
   }
   
-  // Compute bounds
-  Eigen::VectorXd lb(arm_.getNrOfJoints()),
-		  ub(arm_.getNrOfJoints());
-  lb = -torque_max_;
-  ub = torque_max_;    
+  // Torque bounds update 
+  lb_ = -torque_max_;
+  ub_ = torque_max_;    
   
-  // Update Constraints
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A(number_of_constraints_,arm_.getNrOfJoints());
-  Eigen::VectorXd lbA(number_of_constraints_),
-		  ubA(number_of_constraints_),
-		  qd_min(arm_.getNrOfJoints()),
-		  qd_max(arm_.getNrOfJoints());
+  // Joint velocity bounds update
+  qd_max_ = jnt_vel_max_;
+  qd_min_ = -jnt_vel_max_;
   
-  qd_max = jnt_vel_max_;
-  qd_min = -jnt_vel_max_;
+  // Update A
+  A_.block(0,0,7,7) = arm_.getInertiaInverseMatrix().data;
+  A_.block(7,0,3,7) = (J_.data*arm_.getInertiaInverseMatrix().data).block(0,0,3,7);
   
-  A.block(0,0,7,7) = arm_.getInertiaInverseMatrix().data;
-  A.block(7,0,3,7) = (J.data*arm_.getInertiaInverseMatrix().data).block(0,0,3,7);
-  
+  // Update horizon
   double horizon_dt = horizon_steps_* this->getPeriod();
-  
-  Eigen::VectorXd nonLinearTerms(arm_.getNrOfJoints());
-  nonLinearTerms = arm_.getInertiaInverseMatrix().data * ( coriolis.data + gravity.data );    
   
   // TODO adapt this ??
 //   for( int i; i<arm_.getNrOfJoints(); ++i ){
@@ -331,30 +322,20 @@ void CartOptCtrl::updateHook(){
 //         ddq_upper[i] = fmin( ddq_upper[i], -current_jnt_vel[i] / tlim  ); // ddq <= dq^2 / (2(q-qmax))
 //   }
 
-  lbA.block(0,0,arm_.getNrOfJoints(),1) = (( qd_min - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMax(
-      2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
+  // Joint position and velocity constraints
+  lbA_.block(0,0,arm_.getNrOfJoints(),1) = (( qd_min_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMax(
+      2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms_ );
   
-  ubA.block(0,0,arm_.getNrOfJoints(),1) = (( qd_max - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMin(
-      2*(arm_.getJointUpperLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
+  ubA_.block(0,0,arm_.getNrOfJoints(),1) = (( qd_max_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMin(
+      2*(arm_.getJointUpperLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms_ );
   
-  Eigen::Matrix<double,6,1> lbA_cart, ubA_cart;
-  Eigen::VectorXd x_max, x_min;
-  x_max.setZero(6);
-  x_min.setZero(6);
-  x_max.block(0,0,3,1) = cart_max_constraints_;
-  x_min.block(0,0,3,1) = cart_min_constraints_;
-  
-  Eigen::Matrix<double,6,1> xd_curr, x_curr;
-  Eigen::Matrix<double,3,1> x_curr_lin;
-  tf::twistKDLToEigen(Xd_curr_, xd_curr);
-  tf::vectorKDLToEigen(X_curr_.p, x_curr_lin);
-  x_curr.block(0,0,3,1) = x_curr_lin;
+  // Cartesian position bounds update
+  x_max_.block(0,0,3,1) = cart_max_constraints_;
+  x_min_.block(0,0,3,1) = cart_min_constraints_;
 
-  ubA_cart = (2*(x_max - x_curr - horizon_dt * J.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot + J.data * M_inv.data *(coriolis.data + gravity.data)).block(0,0,3,1);
-  lbA_cart = (2*(x_min - x_curr - horizon_dt * J.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot + J.data * M_inv.data *(coriolis.data + gravity.data)).block(0,0,3,1);
-  
-  lbA.block(7,0,3,1) = lbA_cart;
-  ubA.block(7,0,3,1) = ubA_cart;
+  // Cartesian position constraints
+  ubA_.block(7,0,3,1) = (2*(x_max_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * M_inv_.data *(coriolis_.data + gravity_.data)).block(0,0,3,1);
+  lbA_.block(7,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * M_inv_.data *(coriolis_.data + gravity_.data)).block(0,0,3,1);
   
   // number of allowed compute steps
   int nWSR = 1e6; 
@@ -365,7 +346,7 @@ void CartOptCtrl::updateHook(){
   
   if(!qpoases_initialized){
     // Initialise the problem, once it has found a solution, we can hotstart
-    ret = qpoases_solver_->init(H.data(),g.data(),A.data(),lb.data(),ub.data(),lbA.data(),ubA.data(),nWSR);
+    ret = qpoases_solver_->init(H_.data(),g_.data(),A_.data(),lb_.data(),ub_.data(),lbA_.data(),ubA_.data(),nWSR);
     
     // Keep init if it didn't work
     if(ret == qpOASES::SUCCESSFUL_RETURN)
@@ -373,7 +354,7 @@ void CartOptCtrl::updateHook(){
   }
   else{
     // Otherwise let's reuse the previous solution to find a solution faster
-    ret = qpoases_solver_->hotstart(H.data(),g.data(),A.data(),lb.data(),ub.data(),lbA.data(),ubA.data(),nWSR);
+    ret = qpoases_solver_->hotstart(H_.data(),g_.data(),A_.data(),lb_.data(),ub_.data(),lbA_.data(),ubA_.data(),nWSR);
       
     if(ret != qpOASES::SUCCESSFUL_RETURN)
       qpoases_initialized = false;
