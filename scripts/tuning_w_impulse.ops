@@ -28,6 +28,8 @@ stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
 stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
 stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
 stream("CartOptCtrl.ButtonPressed",ros.comm.topic("activate_gravity"))
+stream("CartOptCtrl.XddDes",ros.comm.topic("CartOptCtrl/XddDes"))
+stream("CartOptCtrl.Xdd_des_const",ros.comm.topic("CartOptCtrl/Xdd_des_const"))
 
 // Impulse component
 loadComponent("ImpulseComp","ImpulseComp")

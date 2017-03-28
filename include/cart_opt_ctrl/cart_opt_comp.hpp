@@ -89,8 +89,8 @@ class CartOptCtrl : public RTT::TaskContext{
     double integral_pos_saturation,integral_ori_saturation; 
     
     bool rotation;
-    
-    Eigen::VectorXd regularisation_weight_, damping_weight_;
+    double regularisation_weight_;
+    Eigen::VectorXd damping_weight_;
     Eigen::Matrix<double,6,6> button_selection;
     double transition_gain_;
     double Ec_lim , F_lim;
@@ -103,8 +103,9 @@ class CartOptCtrl : public RTT::TaskContext{
     Eigen::VectorXd p_gains_, d_gains_, i_gains_, torque_max_, jnt_vel_max_;
     Eigen::VectorXd target;
 
+    Eigen::Matrix<double,1,6> delta_x;
     Eigen::VectorXd a_butter,b_butter;
-    Eigen::Matrix<double,6,6> filtered_vel,filtered_acc,old_vel,old_acc;
+    Eigen::Matrix<double,3,6> filtered_vel,filtered_acc,old_vel,old_acc;
     Eigen::Matrix<double,6,1> Xdd_filtered, X_curr_filtered;
 
     std::vector<Eigen::VectorXd> select_components_, select_axes_;

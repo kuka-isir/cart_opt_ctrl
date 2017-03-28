@@ -173,7 +173,7 @@ bool CartOptCtrl::configureHook(){
   d_gains_.resize(6);
   torque_max_.resize(dof);
   jnt_vel_max_.resize(dof);
-  regularisation_weight_.resize(dof);
+
   damping_weight_.resize(dof);
   perturbation = false;
   for(int i = 0; i<select_components_.size() ; i++){
@@ -196,7 +196,7 @@ bool CartOptCtrl::configureHook(){
   position_saturation_ = 0.01;
   orientation_saturation_ = M_PI/100;
   horizon = 15;
-  regularisation_weight_ << 1e-05,1e-05,1e-05,1e-05,1e-05,1e-05,1e-05;
+  regularisation_weight_ = 1e-05;
   damping_weight_  << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
   compensate_gravity_ = true;
   static_pointing = false;
@@ -234,12 +234,13 @@ bool CartOptCtrl::configureHook(){
   qpoases_solver_->setPrintLevel(qpOASES::PL_NONE); // PL_HIGH for full output, PL_NONE for... none
 
   //Butterworth filter
-  // [n,Wn] = buttord(40/500,150/500,3,60)
+  // [n,Wn] = buttord(40/500,200/500,3,20)
   // [b,a] = butter(n,Wn)
+  // induce 8ms delay
 
-  a_butter.setZero(6);b_butter.setZero(6);
-  a_butter << 1.00000 , -4.18692 ,  7.06849 , -6.00846 ,  2.56961 , -0.44204;
-  b_butter << 2.1443e-05 ,  1.0721e-04 ,  2.1443e-04 ,  2.1443e-04 ,  1.0721e-04 ,  2.1443e-05;
+  a_butter.setZero(3);b_butter.setZero(3);
+  a_butter << 1.0000 ,  -1.5526  ,  0.6358;
+  b_butter <<  0.0208,    0.0416  ,  0.0208;
   filtered_acc.setZero();
   filtered_vel.setZero();
   old_acc.setZero();
@@ -306,11 +307,6 @@ void CartOptCtrl::updateHook(){
     log(RTT::Warning) << "Trajectory ports empty !" << endlog();
     X_traj_ = X_curr_;
   }
-
-
-
-
-
 
   // First step, initialise the first X,Xd,Xdd desired
   if(!has_first_command_){
@@ -425,37 +421,37 @@ void CartOptCtrl::updateHook(){
   tf::twistKDLToMsg(Xdd_des,xdd_des_msg);
 
   // Buterworth filter
-
-   for (int i = 0; i<6 ; i++)
+  double size_const = a_butter.size();
+   for (int i = 0; i<size_const ; i++)
    {
-    filtered_acc(5,i) = 0;
-    filtered_vel(5,i) = 0;
-    old_acc(5,i) =Xdd_des(i);
-    old_vel(5,i) =Xd_curr_(i);
-    for (int k = 0; k<6 ; k++)
+    filtered_acc(size_const-1,i) = 0;
+    filtered_vel(size_const-1,i) = 0;
+    old_acc(size_const-1,i) =Xdd_des(i);
+    old_vel(size_const-1,i) =Xd_curr_(i);
+    
+    for (int k = 0; k<a_butter.size() ; k++)
     {
-      filtered_acc(5,i) += b_butter(k) * old_acc(5-k,i);
-      filtered_vel(5,i) += b_butter(k) * old_vel(5-k,i);
+      filtered_acc(size_const-1,i) += b_butter(k) * old_acc(size_const-1-k,i);
+      filtered_vel(size_const-1,i) += b_butter(k) * old_vel(size_const-1-k,i);
     }
-    for (int l = 1; l<6 ; l++)
+    for (int l = 1; l<a_butter.size() ; l++)
     {
-      filtered_acc(5,i) -= a_butter(l) * filtered_acc(5-l,i);
-      filtered_vel(5,i) -= a_butter(l) * filtered_vel(5-l,i);
+      filtered_acc(size_const-1,i) -= a_butter(l) * filtered_acc(size_const-1-l,i);
+      filtered_vel(size_const-1,i) -= a_butter(l) * filtered_vel(size_const-1-l,i);
     }
 
-    for (int j = 0;j<5 ; j++)
+    for (int j = 0;j<a_butter.size()-1 ; j++)
     {
       old_acc(j,i) = old_acc(j+1,i);
       old_vel(j,i) = old_vel(j+1,i);
       filtered_acc(j,i) = filtered_acc(j+1,i);
       filtered_vel(j,i) = filtered_vel(j+1,i);
     }
-
-    Xdd_filtered = filtered_acc.block(0,0,1,6).transpose();
-    X_curr_filtered = filtered_vel.block(0,0,1,6).transpose();
-    tf::matrixEigenToMsg(Xdd_filtered,xdd_des_const_float_msg);    
-
    }
+   
+   Xdd_filtered = filtered_acc.block(0,0,1,6).transpose();
+   X_curr_filtered = filtered_vel.block(0,0,1,6).transpose();
+   tf::matrixEigenToMsg(Xdd_filtered,xdd_des_const_float_msg);    
 
 
   //tf::twistKDLToMsg(Xdd_des,xdd_des_const_msg);
@@ -473,21 +469,7 @@ void CartOptCtrl::updateHook(){
   Eigen::Matrix<double,6,1> jdot_qdot;
   tf::twistKDLToEigen(Jdotqdot,jdot_qdot);
 
-  // We put it in the form ax + b
-  // M(q).qdd + B(qd) + G(q) = T
-  // --> qdd = Minv.( T - B - G)
-  // Xd = J.qd
-  // --> Xdd = Jdot.qdot + J.qdd
-  // --> Xdd = Jdot.qdot + J.Minv.( T - B - G)
-  // --> Xdd = Jdot.qdot + J.Minv.T - J.Minv.( B + G )
-  // And we have Xdd_des = Xdd_traj_ + p_gains_.( X_des - X_curr_) + d_gains_.( Xd_des - Xd_curr_)
-  // ==> We want to compute min(T) || Xdd - Xdd_des ||²
-  // If with replace, we can put it in the form ax + b
-  // With a = J.Minv
-  //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
-
-//   Eigen::MatrixXd regularisation = regularisation_weight_.asDiagonal() * M_inv.data;
-  Eigen::MatrixXd regularisation = regularisation_weight_[0] * M_inv.data;
+  Eigen::MatrixXd regularisation = regularisation_weight_ * M_inv.data;
   Eigen::MatrixXd damping = damping_weight_.asDiagonal();
 
   // Matrices for qpOASES
@@ -516,10 +498,9 @@ void CartOptCtrl::updateHook(){
     button_selection.topLeftCorner(3,3).setZero();
   }
   else{
-    transition_gain_ = std::min(1.0,transition_gain_ + 0.001 * regularisation_weight_[0]);
+    transition_gain_ = std::min(1.0,transition_gain_ + 0.001 * regularisation_weight_);
     button_selection = Eigen::MatrixXd::Identity(6,6);
   }
-
 
   // Write cartesian tasks
   // The cartesian tasks can be decoupling by axes
@@ -534,8 +515,8 @@ void CartOptCtrl::updateHook(){
     a.noalias() =  J.data * select_axis * M_inv.data;
     b.noalias() = (- a * ( coriolis.data + gravity.data ) + jdot_qdot - xdd_des);
 
-    H += transition_gain_ * 2.0 * /*button_selection **/ a.transpose() * select_cartesian_component * a;
-    g += transition_gain_ * 2.0 * /*button_selection **/ a.transpose() * select_cartesian_component * b;
+    H += transition_gain_ * 2.0 * a.transpose() * select_cartesian_component * a;
+    g += transition_gain_ * 2.0 * a.transpose() * select_cartesian_component * b;
   }
 
   // Compute bounds
@@ -553,7 +534,6 @@ void CartOptCtrl::updateHook(){
 
   qd_max = jnt_vel_max_;
   qd_min = -jnt_vel_max_;
-
 
   double horizon_dt = horizon*this->getPeriod();
 
@@ -580,36 +560,27 @@ void CartOptCtrl::updateHook(){
 //         ddq_upper[i] = fmin( ddq_upper[i], -current_jnt_vel[i] / tlim  ); // ddq <= dq^2 / (2(q-qmax))
 //   }
 
-   Eigen::Matrix<double,6,6> Lambda;
-   Lambda.setZero();
+  Eigen::Matrix<double,6,6> Lambda;
+  Lambda.setZero();
 
-   Lambda = (J.data*M_inv.data*J.data.transpose()).inverse();
+  Lambda = (J.data*M_inv.data*J.data.transpose()).inverse();
 
-   double Ec_curr = KineticEnergy();
-   Eigen::Matrix<double,6,1> Xd_curr;Xd_curr.setZero();
-   Eigen::Matrix<double,1,6> delta_x;delta_x.setZero();
-   tf::twistKDLToEigen( Xd_curr_ , Xd_curr);
-   geometry_msgs::Twist Xd_twist_ros_filt;
-//    std_msgs::Float64MultiArray Xd_twist_ros_filt;
-   tf::twistKDLToMsg(Xd_curr_, Xd_twist_ros_filt);
-   //tf::matrixEigenToMsg(J.data*joint_velocity_in_, Xd_twist_ros_filt);
-   port_Xd_out_const_.write(Xd_twist_ros_filt);
+  double Ec_curr = KineticEnergy();
+  delta_x.setZero();
 
+  double horizon_ec = sqrt(2.0 * Ec_lim/(F_lim*(p_gains_(0) * position_saturation_ + integral_pos_saturation)));
+  delta_x = (horizon_ec * X_curr_filtered + 0.5 * horizon_ec * horizon_ec * Xdd_filtered).transpose();
 
-   double horizon_ec = sqrt(2.0 * Ec_lim/(F_lim*(p_gains_(0) * position_saturation_ + integral_pos_saturation)));
-//    cout << horizon_ec << endl;
-   delta_x = (horizon_ec * X_curr_filtered + 0.5 * horizon_ec * horizon_ec * Xdd_filtered).transpose();
+  Eigen::Matrix<double,1,7> A_ec;
+  double B_ec;
 
-   Eigen::Matrix<double,1,7> A_ec;
-   double B_ec;
+  A_ec = delta_x * Lambda * J.data * M_inv.data;
+  B_ec = Ec_curr + delta_x * Lambda * ( jdot_qdot - J.data * M_inv.data * (coriolis.data + gravity.data));
 
-   A_ec = delta_x * Lambda * J.data * M_inv.data;
-   B_ec = Ec_curr + delta_x * Lambda * (jdot_qdot - J.data * M_inv.data *(coriolis.data + gravity.data));
+  lbA.block(0,0,7,1) = (( qd_min - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMax(
+  2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
 
-   lbA.block(0,0,7,1) = (( qd_min - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMax(
-   2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
-
-   ubA.block(0,0,7,1) = (( qd_max - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMin(
+  ubA.block(0,0,7,1) = (( qd_max - joint_velocity_in_ ) / horizon_dt + nonLinearTerms).cwiseMin(
   2*(arm_.getJointUpperLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms );
 
   lbA(7) = 0.0 - B_ec;
