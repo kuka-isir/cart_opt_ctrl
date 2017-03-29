@@ -12,7 +12,7 @@ env:
   matrix:
     - ROS_DISTRO="indigo"
     - ROS_DISTRO="jade"
-    - ROS_DISTRO="kinetic" CATKIN_PARALLEL_JOBS="-p6 --cmake-args -DCMAKE_CXX_FLAGS=-std=c++11 --" ADDITIONAL_DEBS="curl libgazebo7-dev"
+    - ROS_DISTRO="kinetic" ROS_PARALLEL_TEST_JOBS="-j4" CATKIN_PARALLEL_JOBS="-p4 --cmake-args -DCMAKE_CXX_FLAGS=-std=c++11 --" ADDITIONAL_DEBS="curl libgazebo7-dev"
 
 install:
   - git clone https://github.com/ipa-mdl/industrial_ci -b fix/install-space .ci_config
