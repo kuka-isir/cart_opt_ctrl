@@ -10,8 +10,8 @@ env:
     - ADDITIONAL_DEBS="curl"
     
   matrix:
-    - ROS_DISTRO="indigo"
-    - ROS_DISTRO="jade"
+    - ROS_DISTRO="indigo" BEFORE_SCRIPT="$BEFORE_SCRIPT && rm -r /root/catkin_ws/src/gazebo_ros_pkgs"
+    - ROS_DISTRO="jade"   BEFORE_SCRIPT="$BEFORE_SCRIPT && rm -r /root/catkin_ws/src/gazebo_ros_pkgs"
     - ROS_DISTRO="kinetic" ROS_PARALLEL_TEST_JOBS="-j4" CATKIN_PARALLEL_JOBS="-p4 --cmake-args -DCMAKE_CXX_FLAGS=-std=c++11 --" ADDITIONAL_DEBS="curl libgazebo7-dev"
 
 install:
