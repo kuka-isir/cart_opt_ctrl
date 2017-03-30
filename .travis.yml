@@ -4,15 +4,15 @@ language: generic
 
 env:
   global:
-    - UPSTREAM_WORKSPACE=https://raw.githubusercontent.com/kuka-isir/rtt_lwr/rtt_lwr-2.0/lwr_utils/config/rtt_lwr-full.rosinstall
+    - UPSTREAM_WORKSPACE=file #Tell i-ci to use .travis.rosinstall
     - ROS_REPOSITORY_PATH=http://packages.ros.org/ros/ubuntu
     - BEFORE_SCRIPT="source <(curl -s https://raw.githubusercontent.com/ahoarau/rtt_ros_integration-build/master/get_latest_rtt_ros_integration.sh)"
     - ADDITIONAL_DEBS="curl"
     
   matrix:
-    - ROS_DISTRO="indigo" BEFORE_SCRIPT="$BEFORE_SCRIPT && rm -r /root/catkin_ws/src/gazebo_ros_pkgs"
-    - ROS_DISTRO="jade"   BEFORE_SCRIPT="$BEFORE_SCRIPT && rm -r /root/catkin_ws/src/gazebo_ros_pkgs"
-    - ROS_DISTRO="kinetic" ROS_PARALLEL_TEST_JOBS="-j4" CATKIN_PARALLEL_JOBS="-p4 --cmake-args -DCMAKE_CXX_FLAGS=-std=c++11 --" ADDITIONAL_DEBS="curl libgazebo7-dev"
+    - ROS_DISTRO="indigo"
+    - ROS_DISTRO="jade"
+    - ROS_DISTRO="kinetic"
 
 install:
   - git clone https://github.com/ipa-mdl/industrial_ci -b fix/install-space .ci_config
