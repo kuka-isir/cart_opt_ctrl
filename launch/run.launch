@@ -44,6 +44,10 @@
   <!-- Arg to use ros_control instead of a orocos component, not fully supported yet -->
   <arg name="use_ros_control" default="false"/> 
   
+  <rosparam ns="Deployer" subst_value="true">
+    spinner_threads : 20
+  </rosparam>
+  
   <group unless="$(arg use_ros_control)">
     <!--============ CartOptCtrl Params ============-->
     <rosparam ns="CartOptCtrl" subst_value="true">
