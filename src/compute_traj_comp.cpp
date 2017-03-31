@@ -150,6 +150,7 @@ bool KDLTrajCompute::computeTrajectory(){
       ctraject_->Add(traject_);
     }
     else{
+      vel_profile_ = new KDL::VelocityProfile_Trap(vel_max_,acc_max_);
       ctraject_->Add(new KDL::Trajectory_Segment(new KDL::Path_Point(frame), vel_profile_));
     }
     

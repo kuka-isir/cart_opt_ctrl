@@ -60,7 +60,8 @@ bool CartOptCtrl::configureHook(){
   }
   // The number of joints
   const int dof = arm_.getNrOfJoints();
-  
+  number_of_constraints_ = dof + 3;
+
   // Resize the vectors and matrices
   p_gains_.resize(6);
   d_gains_.resize(6);
@@ -73,9 +74,9 @@ bool CartOptCtrl::configureHook(){
     select_components_[i].resize(6);
     select_axes_[i].resize(dof);
   }
-  joint_torque_out_.setZero(dof);
-  joint_position_in_.setZero(dof);
-  joint_velocity_in_.setZero(dof);
+  joint_torque_out_.resize(dof);
+  joint_position_in_.resize(dof);
+  joint_velocity_in_.resize(dof);
   H_.resize(dof,dof);  
   g_.resize(dof);
   a_.resize(6,dof);
@@ -87,8 +88,24 @@ bool CartOptCtrl::configureHook(){
   qd_min_.resize(dof);
   qd_max_.resize(dof);
   nonLinearTerms_.resize(dof);
+  
+  // Matices init
+  H_.setZero(dof, dof);
+  g_.setZero(dof);
+  a_.setZero(6,dof);
+  lb_.setZero(dof);
+  ub_.setZero(dof);
+  A_.setZero(number_of_constraints_,dof);
+  lbA_.setZero(number_of_constraints_);
+  ubA_.setZero(number_of_constraints_);
+  qd_min_.setZero(dof);
+  qd_max_.setZero(dof);
+  nonLinearTerms_.setZero(dof);
   x_max_.setZero(6);
   x_min_.setZero(6);
+  joint_torque_out_.setZero(dof);
+  joint_position_in_.setZero(dof);
+  joint_velocity_in_.setZero(dof);
   
   // Default params
   ee_frame_ = arm_.getSegmentName( arm_.getNrOfSegments() - 1 );
@@ -106,8 +123,8 @@ bool CartOptCtrl::configureHook(){
     select_components_[i].setZero(6);
     select_axes_[i].setZero(dof);
   }
-  select_components_[1].setOnes(6);
-  select_axes_[1].setOnes(dof);
+  select_components_[0].setOnes(6);
+  select_axes_[0].setOnes(dof);
   // TODO: get this from URDF
   torque_max_ << 175,175,99,99,99,37,37 ;
   jnt_vel_max_ << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
@@ -117,8 +134,8 @@ bool CartOptCtrl::configureHook(){
   // nameOfThisComponent/nameOftheProperty
   // Equivalent to ros::param::get("CartOptCtrl/p_gains_");
   rtt_ros_kdl_tools::getAllPropertiesFromROSParam(this);
-  
-  // For now we have 0 constraints for now
+
+  // QPOases init
   int number_of_variables = dof;
   number_of_constraints_ = dof + 3;
   qpoases_solver_.reset(new qpOASES::SQProblem(number_of_variables,number_of_constraints_,qpOASES::HST_POSDEF));
@@ -178,8 +195,6 @@ void CartOptCtrl::updateHook(){
       
     has_first_command_ = true;
   }
-  else
-    log(RTT::Warning) << "Trajectory ports empty !" << endlog();
   
   // First step, initialise the first X,Xd,Xdd desired
   if(!has_first_command_){
@@ -249,7 +264,7 @@ void CartOptCtrl::updateHook(){
   // --> Xdd = Jdot.qdot + J.Minv.( T - B - G)
   // --> Xdd = Jdot.qdot + J.Minv.T - J.Minv.( B + G )
   // And we have Xdd_des = Xdd_traj_ + p_gains_.( X_des - X_curr_) + d_gains_.( Xd_des - Xd_curr_)
-  // ==> We want to compute min(T) || Xdd - Xdd_des ||²
+  // ==> We want to compute min(T) || Xdd - Xdd_des ||Â²
   // If with replace, we can put it in the form ax + b
   // With a = J.Minv
   //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
