@@ -2,7 +2,7 @@
 
 using namespace RTT;
 
-ButtonComp::ButtonComp(const std::string& name) : RTT::TaskContext(name), serial("/dev/ttyACM0", 9600)
+ButtonComp::ButtonComp(const std::string& name) : RTT::TaskContext(name)
 { 
   this->addPort("GravityOut",port_gravity_out_);
   this->addPort("GripperOut",port_gripper_out_);
@@ -11,7 +11,15 @@ ButtonComp::ButtonComp(const std::string& name) : RTT::TaskContext(name), serial
   long_press_time_ = ros::Duration(1.0);
 }
 
-bool ButtonComp::configureHook(){ 
+bool ButtonComp::configureHook(){
+
+  serial.reset(new serial::Serial);
+  serial->setBaudrate(9600);
+  serial->setPort("/dev/ttyACM0");
+  try{
+      serial->open();
+  }catch(...){return false;}
+  
   button_active_ = false;
   gripper_last_open_ = true;
   long_press_ = false;
@@ -28,7 +36,7 @@ bool ButtonComp::startHook(){
 
 void ButtonComp::updateHook(){   
   
-  std::string line = serial.readline();
+  std::string line = serial->readline();
   
   // Data read from serial must be 0 or 1
   if ((line != "0" ) && (line != "1" ))
@@ -37,7 +45,7 @@ void ButtonComp::updateHook(){
   if (line =="1"){
     if(!button_active_){
       button_active_ = true;
-      button_timer_ = ros::Time::now();
+      button_timer_ = rtt_rosclock::host_now();
     }
     ros::Duration time_spent_active = rtt_rosclock::host_now() - button_timer_;
     if(time_spent_active > long_press_time_ && !long_press_){

@@ -31,7 +31,7 @@ class ButtonComp : public RTT::TaskContext{
     bool button_active_, gripper_last_open_, long_press_;
     ros::Duration short_press_time_, long_press_time_;
     ros::Time button_timer_;
-    serial::Serial serial;
+    std::unique_ptr<serial::Serial> serial;
     
     bool run_gravity_;
     std_msgs::Bool run_gripper_;
