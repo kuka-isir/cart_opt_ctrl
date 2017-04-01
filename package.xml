@@ -6,7 +6,7 @@
 
   <maintainer email="hoarau.robotics@gmail.com">Antoine Hoarau</maintainer>
 
-  <license>CeCILL</license>
+  <license>CeCILL-C</license>
 
   <buildtool_depend>catkin</buildtool_depend>
 
@@ -73,7 +73,6 @@
       <plugin_depend>rtt_rospack</plugin_depend>
       <plugin_depend>rtt_nav_msgs</plugin_depend>
       <plugin_depend>rtt_trajectory_msgs</plugin_depend>
-      <plugin_depend>rtt_cart_opt_ctrl</plugin_depend>
     </rtt_ros>
     <controller_interface plugin="${prefix}/ros_control_plugins.xml"/>
   </export>

@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
     tf
     joint_trajectory_controller
     serial
+    rtt_roscomm
 )
 
 
@@ -55,6 +56,10 @@ generate_messages(
 catkin_package(
   CATKIN_DEPENDS message_runtime
 )
+
+# Orocos typekits
+ros_generate_rtt_typekit(cart_opt_ctrl)
+ros_generate_rtt_service_proxies(cart_opt_ctrl)
 
 ## ROS control and trajectory nodes
 add_executable(kdl_trajectory_sender src/kdl_trajectory_sender.cpp)
