@@ -87,7 +87,15 @@ bool CartOptCtrl::configureHook(){
   ubA_.resize(number_of_constraints_);
   qd_min_.resize(dof);
   qd_max_.resize(dof);
+  J_.resize(dof);
+  M_inv_.resize(dof);
+  coriolis_.resize(dof);
+  gravity_.resize(dof);
   nonLinearTerms_.resize(dof);
+  x_max_.resize(6);
+  x_min_.resize(6);
+  joint_pos_vel_.positions.resize(dof);
+  joint_pos_vel_.velocities.resize(dof);
   
   // Matices init
   H_.setZero(dof, dof);
@@ -216,8 +224,8 @@ void CartOptCtrl::updateHook(){
   
   // Debug publish current position and velocity in ROS
   for(int i=0; i< arm_.getNrOfJoints(); i++){
-    joint_pos_vel_.positions.push_back(joint_position_in_(i));
-    joint_pos_vel_.velocities.push_back(joint_velocity_in_(i));
+    joint_pos_vel_.positions[i] = joint_position_in_(i);
+    joint_pos_vel_.velocities[i] = joint_velocity_in_(i);
   }
   port_joint_pos_vel_in_.write(joint_pos_vel_);
   
@@ -269,15 +277,11 @@ void CartOptCtrl::updateHook(){
   // With a = J.Minv
   //      b = - J.Minv.( B + G ) + Jdot.qdot - Xdd_des
 
-  // Update regularisation weights 
-  regularisation_ = regularisation_weight_* M_inv_.data;
-  damping_ = damping_weight_.asDiagonal();
-
   // Regularisation task
   // Can be tau, tau-g or tau-g-b*qdot
-  H_ = 2.0 * regularisation_;
+  H_ = 2.0 * regularisation_weight_ * M_inv_.data;
   if (compensate_gravity_)
-    g_ = - 2.0* (regularisation_* (gravity_.data - damping_* joint_velocity_in_));
+    g_ = - 2.0* (regularisation_weight_ * M_inv_.data * (gravity_.data - damping_weight_.asDiagonal() * joint_velocity_in_));
   
   // Read button press port
   this->port_button_pressed_in_.read(button_pressed_);
@@ -291,16 +295,13 @@ void CartOptCtrl::updateHook(){
   
   // Write cartesian tasks
   // The cartesian tasks can be decoupling by axes  
-  for(int i=0; i<select_components_.size();i++){
-    select_axis_ = select_axes_[i].asDiagonal();
-    select_cartesian_component_ = select_components_[i].asDiagonal();
-    
-    a_.noalias() =  J_.data * select_axis_ * M_inv_.data;
+  for(int i=0; i<select_components_.size();i++){    
+    a_.noalias() =  J_.data * select_axes_[i].asDiagonal() * M_inv_.data;
     b_.noalias() = (- a_ * ( coriolis_.data + gravity_.data ) + jdot_qdot_ - xdd_des_);
     
-    H_ += transition_gain_ * 2.0 * a_.transpose() * select_cartesian_component_ * a_;  
-    g_ += transition_gain_ * 2.0 * a_.transpose() * select_cartesian_component_ * b_;
-  }
+    H_ += transition_gain_ * 2.0 * a_.transpose() * select_components_[i].asDiagonal() * a_;  
+    g_ += transition_gain_ * 2.0 * a_.transpose() * select_components_[i].asDiagonal() * b_;
+  }  
   
   // Torque bounds update 
   lb_ = -torque_max_;
@@ -311,8 +312,8 @@ void CartOptCtrl::updateHook(){
   qd_min_ = -jnt_vel_max_;
   
   // Update A
-  A_.block(0,0,7,7) = arm_.getInertiaInverseMatrix().data;
-  A_.block(7,0,3,7) = (J_.data*arm_.getInertiaInverseMatrix().data).block(0,0,3,7);
+  A_.block(0,0,arm_.getNrOfJoints(),arm_.getNrOfJoints()) = arm_.getInertiaInverseMatrix().data;
+  A_.block(7,0,3,arm_.getNrOfJoints()) = (J_.data*arm_.getInertiaInverseMatrix().data).block(0,0,3,arm_.getNrOfJoints());
   
   // Update horizon
   double horizon_dt = horizon_steps_* this->getPeriod();
@@ -391,7 +392,6 @@ void CartOptCtrl::updateHook(){
   // Send torques to the robot
   port_joint_torque_out_.write(joint_torque_out_);
 }
-
 
 void CartOptCtrl::stopHook(){
   has_first_command_ = false;

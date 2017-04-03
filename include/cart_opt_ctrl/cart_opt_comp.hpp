@@ -56,16 +56,13 @@ class CartOptCtrl : public RTT::TaskContext{
     KDL::Twist Jdotqdot_;
     Eigen::Matrix<double,6,1> jdot_qdot_;
     Eigen::Matrix<double,6,1> xdd_des_;
-    Eigen::MatrixXd regularisation_;
-    Eigen::MatrixXd damping_;
-    
+
     // Matrices for qpOASES
     // NOTE: We need RowMajor (see qpoases doc)
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> H_;
     Eigen::VectorXd g_;
     Eigen::Matrix<double,6,Eigen::Dynamic> a_;
     Eigen::Matrix<double,6,1> b_;
-    Eigen::MatrixXd select_axis_, select_cartesian_component_;
     Eigen::VectorXd lb_, ub_;
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A_;
     Eigen::VectorXd lbA_, ubA_, qd_min_, qd_max_;
