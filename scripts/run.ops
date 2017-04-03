@@ -17,17 +17,13 @@ import("rtt_dynamic_reconfigure")
 // Load controller component
 ros.import("cart_opt_ctrl")
 
-loadComponent("ButtonComp","ButtonComp")
-setActivity("ButtonComp",0.01,65,ORO_SCHED_OTHER)
-stream("ButtonComp.GripperOut",ros.comm.topic("/activate_gripper"))
-
 loadComponent("KDLTrajCompute","KDLTrajCompute")
 setActivity("KDLTrajCompute",0.001,60,ORO_SCHED_RT)
 loadService("KDLTrajCompute","rosservice")
 KDLTrajCompute.rosservice.connect("updateWaypoints","/KDLTrajCompute/updateWaypoints","cart_opt_ctrl/UpdateWaypoints")
 stream("KDLTrajCompute.PathROSOut",ros.comm.topic("KDLTrajGen/path"))
 stream("KDLTrajCompute.PathPosesROSOut",ros.comm.topic("KDLTrajGen/pose_array"))
-connect("ButtonComp.GravityOut","KDLTrajCompute.ButtonPressed",ConnPolicy())
+stream("KDLTrajCompute.ButtonPressed",ros.comm.topic("/activate_gravity"))
 loadService("KDLTrajCompute", "reconfigure")
 KDLTrajCompute.reconfigure.min.vel_max = 0.0
 KDLTrajCompute.reconfigure.max.vel_max = 0.5
@@ -55,11 +51,7 @@ connect("KDLTrajCompute.TrajectoryPointAccOut","CartOptCtrl.TrajectoryPointAccIn
 stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
 stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
 stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
-connect("ButtonComp.GravityOut","CartOptCtrl.ButtonPressed",ConnPolicy())
-
-// Configure & start button component
-configureComponent("ButtonComp")
-startComponent("ButtonComp")
+stream("CartOptCtrl.ButtonPressed",ros.comm.topic("/activate_gravity"))
 
 // Configure & start trajectory sender
 configureComponent("KDLTrajCompute")
