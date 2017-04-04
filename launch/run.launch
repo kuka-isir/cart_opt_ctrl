@@ -52,7 +52,7 @@
     <!--============ CartOptCtrl Params ============-->
     <rosparam ns="CartOptCtrl" subst_value="true">
       torque_max : [160.0, 160.0, 90.0, 90.0, 90.0, 35.0, 35.0]
-      joint_vel_max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      joint_vel_max : [1.8, 1.8, 2.0, 2.0, 3.5, 3.0, 3.0]
       p_gains : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
       d_gains : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
       position_saturation : 0.01
