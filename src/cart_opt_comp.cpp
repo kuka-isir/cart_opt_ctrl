@@ -32,6 +32,7 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addProperty("cart_min_constraints",cart_min_constraints_).doc("Max cartesian position constraints");
   this->addProperty("cart_max_constraints",cart_max_constraints_).doc("Min cartesian position constraints");
   this->addProperty("horizon_steps",horizon_steps_).doc("Number of period to anticipate");
+  this->addProperty("ec_lim",ec_lim_).doc("Max Ec limit");
   
   select_components_.resize(6);
   select_axes_.resize(select_components_.size());
@@ -60,7 +61,7 @@ bool CartOptCtrl::configureHook(){
   }
   // The number of joints
   const int dof = arm_.getNrOfJoints();
-  number_of_constraints_ = dof + 3;
+  number_of_constraints_ = dof + 3 + 1;
 
   // Resize the vectors and matrices
   p_gains_.resize(6);
@@ -136,6 +137,7 @@ bool CartOptCtrl::configureHook(){
   // TODO: get this from URDF
   torque_max_ << 175,175,99,99,99,37,37 ;
   jnt_vel_max_ << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
+  ec_lim_ = 2.0;
   
   // Match all properties (defined in the constructor) 
   // with the rosparams in the namespace : 
@@ -145,7 +147,7 @@ bool CartOptCtrl::configureHook(){
 
   // QPOases init
   int number_of_variables = dof;
-  number_of_constraints_ = dof + 3;
+  number_of_constraints_ = dof + 3 + 1;
   qpoases_solver_.reset(new qpOASES::SQProblem(number_of_variables,number_of_constraints_,qpOASES::HST_POSDEF));
   
   // QPOases options
@@ -259,7 +261,7 @@ void CartOptCtrl::updateHook(){
   gravity_ = arm_.getGravityTorque();
   Jdotqdot_ = arm_.getSegmentJdotQdot(ee_frame_);
   tf::twistKDLToEigen(Jdotqdot_,jdot_qdot_);
-  nonLinearTerms_ = arm_.getInertiaInverseMatrix().data * ( coriolis_.data + gravity_.data );
+  nonLinearTerms_ = M_inv_.data * ( coriolis_.data + gravity_.data );
   tf::twistKDLToEigen(Xd_curr_, xd_curr_);
   tf::vectorKDLToEigen(X_curr_.p, x_curr_lin_);
   x_curr_.block(0,0,3,1) = x_curr_lin_;
@@ -311,13 +313,12 @@ void CartOptCtrl::updateHook(){
   qd_max_ = jnt_vel_max_;
   qd_min_ = -jnt_vel_max_;
   
-  // Update A
-  A_.block(0,0,arm_.getNrOfJoints(),arm_.getNrOfJoints()) = arm_.getInertiaInverseMatrix().data;
-  A_.block(7,0,3,arm_.getNrOfJoints()) = (J_.data*arm_.getInertiaInverseMatrix().data).block(0,0,3,arm_.getNrOfJoints());
-  
   // Update horizon
   double horizon_dt = horizon_steps_* this->getPeriod();
   
+  // Joint position and velocity constraints
+  A_.block(0,0,arm_.getNrOfJoints(),arm_.getNrOfJoints()) = M_inv_.data;
+
   // TODO adapt this ??
 //   for( int i; i<arm_.getNrOfJoints(); ++i ){
 //     if( fabs(current_jnt_vel[i]) < 1.0e-12 ) // avoid division by zero, por favor
@@ -338,20 +339,27 @@ void CartOptCtrl::updateHook(){
 //         ddq_upper[i] = fmin( ddq_upper[i], -current_jnt_vel[i] / tlim  ); // ddq <= dq^2 / (2(q-qmax))
 //   }
 
-  // Joint position and velocity constraints
   lbA_.block(0,0,arm_.getNrOfJoints(),1) = (( qd_min_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMax(
       2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms_ );
   
   ubA_.block(0,0,arm_.getNrOfJoints(),1) = (( qd_max_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMin(
       2*(arm_.getJointUpperLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms_ );
   
-  // Cartesian position bounds update
+  // Cartesian position constraints
+  A_.block(7,0,3,arm_.getNrOfJoints()) = (J_.data*M_inv_.data).block(0,0,3,arm_.getNrOfJoints());
   x_max_.block(0,0,3,1) = cart_max_constraints_;
   x_min_.block(0,0,3,1) = cart_min_constraints_;
-
-  // Cartesian position constraints
-  ubA_.block(7,0,3,1) = (2*(x_max_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * M_inv_.data *(coriolis_.data + gravity_.data)).block(0,0,3,1);
-  lbA_.block(7,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * M_inv_.data *(coriolis_.data + gravity_.data)).block(0,0,3,1);
+  ubA_.block(7,0,3,1) = (2*(x_max_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
+  lbA_.block(7,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
+  
+  // Ec constraint
+  Lambda_ = (J_.data * M_inv_.data * J_.data.transpose()).inverse();
+  delta_x_ = xd_curr_ * horizon_dt + 0.5 * xdd_des_ * horizon_dt * horizon_dt;
+  double ec_curr = 0.5 * xd_curr_.transpose() * Lambda_ * xd_curr_;
+  double ec_next = ec_curr + delta_x_.transpose() * Lambda_ * (jdot_qdot_ - J_.data * nonLinearTerms_);
+  A_.block(10,0,1,arm_.getNrOfJoints()) = delta_x_.transpose() * Lambda_ * J_.data * M_inv_.data;
+  ubA_(10) = ec_lim_ - ec_next;
+  lbA_(10) = 0.0 - ec_next;
   
   // number of allowed compute steps
   int nWSR = 1e6; 

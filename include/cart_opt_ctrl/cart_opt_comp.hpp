@@ -70,6 +70,8 @@ class CartOptCtrl : public RTT::TaskContext{
     Eigen::VectorXd x_max_, x_min_;
     Eigen::Matrix<double,6,1> xd_curr_, x_curr_;
     Eigen::Matrix<double,3,1> x_curr_lin_;
+    Eigen::Matrix<double,6,6> Lambda_;
+    Eigen::Matrix<double,6,1> delta_x_;
     
     // For ROS debug
     geometry_msgs::Pose x_des_pos_out_;
@@ -103,6 +105,7 @@ class CartOptCtrl : public RTT::TaskContext{
     bool compensate_gravity_;
     Eigen::VectorXd p_gains_, d_gains_, torque_max_, jnt_vel_max_;
     std::vector<Eigen::VectorXd> select_components_, select_axes_;
+    double ec_lim_;
 
     std::unique_ptr<qpOASES::SQProblem> qpoases_solver_;
     int number_of_constraints_;
