@@ -98,12 +98,13 @@ class CartOptCtrl : public RTT::TaskContext{
     KDL::Twist X_err_,Xd_err_,Xdd_err_;
     KDL::Twist Xd_curr_,Xdd_curr_,Xd_traj_,Xdd_traj_;
     KDL::Twist Xdd_des_;
+    KDL::Twist integral_error_;
     
     Eigen::VectorXd damping_weight_, cart_min_constraints_, cart_max_constraints_;
     double transition_gain_, regularisation_weight_, horizon_steps_;
-    double position_saturation_, orientation_saturation_;
+    double position_saturation_, orientation_saturation_, integral_pos_saturation_, integral_rot_saturation_;
     bool compensate_gravity_;
-    Eigen::VectorXd p_gains_, d_gains_, torque_max_, jnt_vel_max_;
+    Eigen::VectorXd p_gains_, i_gains_, d_gains_, torque_max_, jnt_vel_max_;
     std::vector<Eigen::VectorXd> select_components_, select_axes_;
     double ec_lim_;
 

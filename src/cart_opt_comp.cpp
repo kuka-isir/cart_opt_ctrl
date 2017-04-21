@@ -21,9 +21,12 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addProperty("frame_of_interest",ee_frame_).doc("The robot frame to track the trajectory");
   this->addProperty("base_frame",base_frame_).doc("The robot frame to track the trajectory");
   this->addProperty("p_gains",p_gains_).doc("Proportional gains");
+  this->addProperty("i_gains",i_gains_).doc("Integral gains");
   this->addProperty("d_gains",d_gains_).doc("Derivative gains");
   this->addProperty("position_saturation",position_saturation_).doc("Position saturation");
   this->addProperty("orientation_saturation",orientation_saturation_).doc("Orientation saturation");
+  this->addProperty("integral_pos_saturation",integral_pos_saturation_).doc("Integral position saturation");
+  this->addProperty("integral_rot_saturation",integral_rot_saturation_).doc("Integral orientation saturation");
   this->addProperty("regularisation_weight",regularisation_weight_).doc("Weight for the regularisation in QP");
   this->addProperty("compensate_gravity",compensate_gravity_).doc("Do we need to compensate gravity ?");
   this->addProperty("damping_weight",damping_weight_).doc("Weight for the damping in regularisation");
@@ -65,6 +68,7 @@ bool CartOptCtrl::configureHook(){
 
   // Resize the vectors and matrices
   p_gains_.resize(6);
+  i_gains_.resize(6);
   d_gains_.resize(6);
   torque_max_.resize(dof);
   jnt_vel_max_.resize(dof);
@@ -115,13 +119,17 @@ bool CartOptCtrl::configureHook(){
   joint_torque_out_.setZero(dof);
   joint_position_in_.setZero(dof);
   joint_velocity_in_.setZero(dof);
+  KDL::SetToZero(integral_error_);
   
   // Default params
   ee_frame_ = arm_.getSegmentName( arm_.getNrOfSegments() - 1 );
   p_gains_ << 1000,1000,1000,1000,1000,1000;
+  i_gains_ << 0,0,0,0,0,0;
   d_gains_ << 22,22,22,22,22,22;
   position_saturation_ = 0.01;
   orientation_saturation_ = M_PI/100;
+  integral_pos_saturation_ = 0.0;
+  integral_rot_saturation_ = 0.0;
   regularisation_weight_ = 1e-05;
   damping_weight_  << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
   cart_min_constraints_.setConstant(3, -10.0);
@@ -247,11 +255,35 @@ void CartOptCtrl::updateHook(){
       X_err_(i) = std::min(orientation_saturation_, X_err_(i));
     else
       X_err_(i) = std::max(-orientation_saturation_, X_err_(i));
-  }    
+  }
+  
+  // Saturate the integral term
+  for(unsigned int i=0; i<3; ++i ){
+    if (i_gains_(i) > 0){
+      integral_error_(i) += X_err_(i) * this->getPeriod();
+      if(integral_error_(i) >0)
+        integral_error_(i) = std::min(integral_pos_saturation_ / i_gains_(i), integral_error_(i));
+      else
+        integral_error_(i) = std::max(-integral_pos_saturation_ / i_gains_(i), integral_error_(i));
+    }
+    else
+      integral_error_(i) = 0;
+  }
+  for(unsigned int i=3; i<6; ++i ){
+    if (i_gains_(i) > 0){
+      integral_error_(i) += X_err_(i) * this->getPeriod();
+      if(integral_error_(i) >0)
+        integral_error_(i) = std::min(integral_rot_saturation_ / i_gains_(i), integral_error_(i));
+      else
+        integral_error_(i) = std::max(-integral_rot_saturation_ / i_gains_(i), integral_error_(i));
+    }
+    else
+      integral_error_(i) = 0;
+  }  
   
   // Apply PD 
   for( unsigned int i=0; i<6; ++i )
-    Xdd_des_(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) - d_gains_(i) * ( Xd_curr_(i) );
+    Xdd_des_(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) + i_gains_(i) * integral_error_(i) - d_gains_(i) * ( Xd_curr_(i) );
   tf::twistKDLToEigen(Xdd_des_,xdd_des_);
   
   // Update current Matrices and vectors
