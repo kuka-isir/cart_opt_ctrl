@@ -104,7 +104,8 @@ class CartOptCtrl : public RTT::TaskContext{
     Eigen::VectorXd damping_weight_, cart_min_constraints_, cart_max_constraints_;
     double transition_gain_, regularisation_weight_, horizon_steps_;
     double position_saturation_, orientation_saturation_, integral_pos_saturation_, integral_rot_saturation_;
-    bool compensate_gravity_;
+    double max_viscous_coeff_, viscous_walls_thickness_;
+    bool compensate_gravity_, viscous_walls_;
     Eigen::VectorXd p_gains_, i_gains_, d_gains_, torque_max_, jnt_vel_max_;
     std::vector<Eigen::VectorXd> select_components_, select_axes_;
     double ec_lim_;

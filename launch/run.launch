@@ -63,6 +63,9 @@
       ec_lim : 2.0
       regularisation_weight : 0.000001
       compensate_gravity : true
+      viscous_walls : true
+      max_viscous_coeff = 100;
+      viscous_walls_thickness = 0.3;
       damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
       cart_min_constraints : [-0.6, -0.25, 0.05]
       cart_max_constraints : [0.9, 0.5, 0.8]

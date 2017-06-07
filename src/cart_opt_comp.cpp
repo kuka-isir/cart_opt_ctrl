@@ -29,6 +29,9 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addProperty("integral_rot_saturation",integral_rot_saturation_).doc("Integral orientation saturation");
   this->addProperty("regularisation_weight",regularisation_weight_).doc("Weight for the regularisation in QP");
   this->addProperty("compensate_gravity",compensate_gravity_).doc("Do we need to compensate gravity ?");
+  this->addProperty("viscous_walls",viscous_walls_).doc("Do we need viscous wall around constraints ?");
+  this->addProperty("max_viscous_coeff",max_viscous_coeff_).doc("Coefficient for viscous walls");
+  this->addProperty("viscous_walls_thickness",viscous_walls_thickness_).doc("Thickness of the viscous walls");
   this->addProperty("damping_weight",damping_weight_).doc("Weight for the damping in regularisation");
   this->addProperty("torque_max",torque_max_).doc("Max torque for each joint");
   this->addProperty("joint_vel_max",jnt_vel_max_).doc("Max velocity for each joint");
@@ -131,11 +134,14 @@ bool CartOptCtrl::configureHook(){
   integral_pos_saturation_ = 0.0;
   integral_rot_saturation_ = 0.0;
   regularisation_weight_ = 1e-05;
+  max_viscous_coeff_ = 100;
+  viscous_walls_thickness_ = 0.3;
   damping_weight_  << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
   cart_min_constraints_.setConstant(3, -10.0);
   cart_max_constraints_.setConstant(3, 10.0);
   horizon_steps_ = 15.0; 
   compensate_gravity_ = true;
+  viscous_walls_ = true;
   for(int i = 1; i<select_components_.size() ; i++){
     select_components_[i].setZero(6);
     select_axes_[i].setZero(dof);
@@ -396,6 +402,26 @@ void CartOptCtrl::updateHook(){
   A_.block(10,0,1,arm_.getNrOfJoints()) = delta_x_.transpose() * Lambda_ * J_.data * M_inv_.data;
   ubA_(10) = ec_lim_ - ec_next_filtered_;
   lbA_(10) = -100000000.0 - ec_next_filtered_;
+  
+  // Viscous walls around cartesian constraints
+  if(viscous_walls_){
+    KDL::Twist twist(KDL::Vector(0,0,0),KDL::Vector(0,0,0));
+    Eigen::Matrix<double,6,1> eigen_twist;
+    for(int i=0; i<cart_min_constraints_.size(); i++){
+      if (xd_curr_(i)<0){
+        twist.vel.data[i] = Xd_curr_.vel.data[i];
+        tf::twistKDLToEigen(twist, eigen_twist);
+        g_ +=  2.0* max_viscous_coeff_*(1-1/(1+std::exp(((x_curr_(i)-viscous_walls_thickness_-cart_min_constraints_(i))*(2/-viscous_walls_thickness_)-1)*6)))* regularisation_weight_ * M_inv_.data *J_.data.transpose()* eigen_twist;
+      }
+    }
+    for(int i=0; i<cart_max_constraints_.size(); i++){
+      if (xd_curr_(i)>0){
+        twist.vel.data[i] = Xd_curr_.vel.data[i];
+        tf::twistKDLToEigen(twist, eigen_twist);
+        g_ +=  2.0* max_viscous_coeff_*(1-1/(1+std::exp(((x_curr_(i)+viscous_walls_thickness_-cart_max_constraints_(i))*(2/viscous_walls_thickness_)-1)*6)))* regularisation_weight_ * M_inv_.data *J_.data.transpose()* eigen_twist;
+      }
+    }
+  }
   
   // number of allowed compute steps
   int nWSR = 1e6; 
