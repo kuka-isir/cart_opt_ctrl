@@ -146,6 +146,7 @@ bool CartOptCtrl::configureHook(){
   torque_max_ << 175,175,99,99,99,37,37 ;
   jnt_vel_max_ << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
   ec_lim_ = 2.0;
+  ec_next_filtered_ = 0;
   
   // Match all properties (defined in the constructor) 
   // with the rosparams in the namespace : 
@@ -210,16 +211,12 @@ void CartOptCtrl::updateHook(){
     X_traj_ = pt_pos_in_;
     Xd_traj_ = pt_vel_in_;
     Xdd_traj_ = pt_acc_in_;
-      
-    has_first_command_ = true;
   }
   
   // First step, initialise the first X,Xd,Xdd desired
-  if(!has_first_command_){
-    // Stay at the same position
+  // Stay at the same position
+  if(!has_first_command_)
     X_traj_ = X_curr_;
-    has_first_command_ = true;
-  }
   
   // Compute errors
   X_err_ = diff( X_curr_ , X_traj_ );
@@ -389,9 +386,16 @@ void CartOptCtrl::updateHook(){
   delta_x_ = xd_curr_ * horizon_dt + 0.5 * xdd_des_ * horizon_dt * horizon_dt;
   double ec_curr = 0.5 * xd_curr_.transpose() * Lambda_ * xd_curr_;
   double ec_next = ec_curr + delta_x_.transpose() * Lambda_ * (jdot_qdot_ - J_.data * nonLinearTerms_);
+
+  // Filter estimation of next kinetic energy
+  if (!has_first_command_)
+    ec_next_filtered_ = ec_next;
+  else
+    ec_next_filtered_ = 0.95 * ec_next_filtered_ + 0.05 * ec_next;
+
   A_.block(10,0,1,arm_.getNrOfJoints()) = delta_x_.transpose() * Lambda_ * J_.data * M_inv_.data;
-  ubA_(10) = ec_lim_ - ec_next;
-  lbA_(10) = 0.0 - ec_next;
+  ubA_(10) = ec_lim_ - ec_next_filtered_;
+  lbA_(10) = -100000000.0 - ec_next_filtered_;
   
   // number of allowed compute steps
   int nWSR = 1e6; 
@@ -431,6 +435,7 @@ void CartOptCtrl::updateHook(){
 
   // Send torques to the robot
   port_joint_torque_out_.write(joint_torque_out_);
+  has_first_command_ = true;
 }
 
 void CartOptCtrl::stopHook(){
