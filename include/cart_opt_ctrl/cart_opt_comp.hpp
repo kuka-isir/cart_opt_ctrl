@@ -13,8 +13,10 @@
 
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/PointStamped.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/Float32.h>
 
 #include <eigen_conversions/eigen_kdl.h>
 #include <kdl/frames_io.hpp>
@@ -40,6 +42,7 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::OutputPort<geometry_msgs::PoseStamped> port_x_des_;
     RTT::OutputPort<trajectory_msgs::JointTrajectoryPoint> port_joint_pos_vel_in_; 
     RTT::OutputPort<geometry_msgs::Twist> port_error_out_; 
+    RTT::OutputPort<std_msgs::Float32> port_ec_lim_out_;
     
     // Input ports
     RTT::InputPort<KDL::Frame> port_pnt_pos_in_;
@@ -48,6 +51,7 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::InputPort<Eigen::VectorXd> port_joint_position_in_;
     RTT::InputPort<Eigen::VectorXd> port_joint_velocity_in_;
     RTT::InputPort<bool> port_button_pressed_in_;
+    RTT::InputPort<geometry_msgs::PointStamped> port_human_pos_in_;
     
     KDL::Jacobian J_;
     KDL::JntSpaceInertiaMatrix M_inv_;
@@ -88,6 +92,7 @@ class CartOptCtrl : public RTT::TaskContext{
                     joint_position_in_,
                     joint_velocity_in_;
     
+    double distance_to_contact_;
 
     KDL::Frame pt_pos_in_;
     KDL::Twist pt_vel_in_, pt_acc_in_;
@@ -108,7 +113,7 @@ class CartOptCtrl : public RTT::TaskContext{
     bool compensate_gravity_, viscous_walls_;
     Eigen::VectorXd p_gains_, i_gains_, d_gains_, torque_max_, jnt_vel_max_;
     std::vector<Eigen::VectorXd> select_components_, select_axes_;
-    double ec_lim_;
+    double ec_lim_, ec_max_, ec_safe_, human_min_dist_, human_max_dist_;
 
     std::unique_ptr<qpOASES::SQProblem> qpoases_solver_;
     int number_of_constraints_;

@@ -52,6 +52,8 @@ stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
 stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
 stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
 stream("CartOptCtrl.ButtonPressed",ros.comm.topic("/activate_gravity"))
+stream("CartOptCtrl.HumanPose",ros.comm.topic("/kinect_merge/closest_pt_tracking"))
+stream("CartOptCtrl.Distance",ros.comm.topic("/cart_opt_ctrl/ec_lim"))
 
 // Configure & start trajectory sender
 configureComponent("KDLTrajCompute")

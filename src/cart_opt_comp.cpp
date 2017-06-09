@@ -16,6 +16,8 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addPort("JointPosVelIn",port_joint_pos_vel_in_);
   this->addPort("PoseErrorOut",port_error_out_);
   this->addPort("ButtonPressed",port_button_pressed_in_);
+  this->addPort("HumanPose",port_human_pos_in_);
+  this->addPort("Distance",port_ec_lim_out_);
   
   // Orocos properties/ROS params
   this->addProperty("frame_of_interest",ee_frame_).doc("The robot frame to track the trajectory");
@@ -38,7 +40,10 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addProperty("cart_min_constraints",cart_min_constraints_).doc("Max cartesian position constraints");
   this->addProperty("cart_max_constraints",cart_max_constraints_).doc("Min cartesian position constraints");
   this->addProperty("horizon_steps",horizon_steps_).doc("Number of period to anticipate");
-  this->addProperty("ec_lim",ec_lim_).doc("Max Ec limit");
+  this->addProperty("ec_max",ec_max_).doc("Max Ec limit");
+  this->addProperty("ec_safe",ec_safe_).doc("Min Ec limit");
+  this->addProperty("human_min_dist",human_min_dist_).doc("Human minimum distance for ec = ec_safe");
+  this->addProperty("human_max_dist",human_max_dist_).doc("Human distance for ec = ec_max");
   
   select_components_.resize(6);
   select_axes_.resize(select_components_.size());
@@ -151,8 +156,12 @@ bool CartOptCtrl::configureHook(){
   // TODO: get this from URDF
   torque_max_ << 175,175,99,99,99,37,37 ;
   jnt_vel_max_ << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
-  ec_lim_ = 2.0;
+  ec_max_ = 0.5;
+  ec_safe_ = 0.02;
+  human_min_dist_ = 0.15;
+  human_max_dist_ = 4;
   ec_next_filtered_ = 0;
+  distance_to_contact_ = 1000;
   
   // Match all properties (defined in the constructor) 
   // with the rosparams in the namespace : 
@@ -387,7 +396,7 @@ void CartOptCtrl::updateHook(){
   ubA_.block(7,0,3,1) = (2*(x_max_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
   lbA_.block(7,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
   
-  // Ec constraint
+  // Ec current and Ec next
   Lambda_ = (J_.data * M_inv_.data * J_.data.transpose()).inverse();
   delta_x_ = xd_curr_ * horizon_dt + 0.5 * xdd_des_ * horizon_dt * horizon_dt;
   double ec_curr = 0.5 * xd_curr_.transpose() * Lambda_ * xd_curr_;
@@ -399,9 +408,33 @@ void CartOptCtrl::updateHook(){
   else
     ec_next_filtered_ = 0.95 * ec_next_filtered_ + 0.05 * ec_next;
 
+  // Compute Ec_lim from last_human_pose
+  geometry_msgs::PointStamped last_human_pose;
+  if (port_human_pos_in_.read(last_human_pose) == RTT::NewData);
+    distance_to_contact_ = std::sqrt((last_human_pose.point.x- x_curr_(0))*(last_human_pose.point.x- x_curr_(0))
+    + (last_human_pose.point.y- x_curr_(1))*(last_human_pose.point.y- x_curr_(1))
+  );
+  if(!button_pressed_){
+    ec_lim_ = ec_safe_;
+    if (distance_to_contact_ <= human_min_dist_)
+      ec_lim_ = ec_safe_;
+    if (distance_to_contact_ >= human_max_dist_)
+      ec_lim_ = ec_max_;
+    if ((distance_to_contact_ < human_max_dist_)&&(distance_to_contact_>human_min_dist_))
+      ec_lim_ = distance_to_contact_ * (ec_max_-ec_safe_)/(human_max_dist_-human_min_dist_);
+  }
+  else
+    ec_lim_ = 1;
+
+  // Ec constraint
   A_.block(10,0,1,arm_.getNrOfJoints()) = delta_x_.transpose() * Lambda_ * J_.data * M_inv_.data;
   ubA_(10) = ec_lim_ - ec_next_filtered_;
   lbA_(10) = -100000000.0 - ec_next_filtered_;
+  
+  // Ec limit stream to ROS
+  std_msgs::Float32 ec_msg;
+  ec_msg.data = ec_lim_;
+  port_ec_lim_out_.write(ec_msg);
   
   // Viscous walls around cartesian constraints
   if(viscous_walls_){
