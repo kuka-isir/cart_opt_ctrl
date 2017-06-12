@@ -412,10 +412,9 @@ void CartOptCtrl::updateHook(){
 
   // Compute Ec_lim from last_human_pose
   geometry_msgs::PointStamped last_human_pose;
-  if (port_human_pos_in_.read(last_human_pose) == RTT::NewData);
+  if (port_human_pos_in_.read(last_human_pose) == RTT::NewData)
     distance_to_contact_ = std::sqrt((last_human_pose.point.x- x_curr_(0))*(last_human_pose.point.x- x_curr_(0))
-    + (last_human_pose.point.y- x_curr_(1))*(last_human_pose.point.y- x_curr_(1))
-  );
+    + (last_human_pose.point.y- x_curr_(1))*(last_human_pose.point.y- x_curr_(1)));
   if(!button_pressed_){
     ec_lim_ = ec_safe_;
     if (distance_to_contact_ <= human_min_dist_)
