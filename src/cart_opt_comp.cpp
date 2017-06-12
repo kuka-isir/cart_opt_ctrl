@@ -130,6 +130,7 @@ bool CartOptCtrl::configureHook(){
   joint_velocity_in_.setZero(dof);
   KDL::SetToZero(integral_error_);
   viscous_coeffs_.setZero(6);
+  xd_curr_filtered_.setZero();
   
   // Default params
   ee_frame_ = arm_.getSegmentName( arm_.getNrOfSegments() - 1 );
@@ -162,7 +163,6 @@ bool CartOptCtrl::configureHook(){
   ec_safe_ = 0.02;
   human_min_dist_ = 0.15;
   human_max_dist_ = 4;
-  ec_next_filtered_ = 0;
   distance_to_contact_ = 1000;
   
   // Match all properties (defined in the constructor) 
@@ -396,20 +396,22 @@ void CartOptCtrl::updateHook(){
   x_max_.block(0,0,3,1) = cart_max_constraints_;
   x_min_.block(0,0,3,1) = cart_min_constraints_;
   ubA_.block(7,0,3,1) = (2*(x_max_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
-  lbA_.block(7,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
+  lbA_.block(7,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);  
+  
+  // Filter current speed for kinetic energy computation
+  if (!has_first_command_)
+    xd_curr_filtered_ = xd_curr_;
+  else{
+    for(int i=0; i<6 ; i++)
+      xd_curr_filtered_(i) = 0.95 * xd_curr_filtered_(i) + 0.05 * xd_curr_(i);
+  }
   
   // Ec current and Ec next
   Lambda_ = (J_.data * M_inv_.data * J_.data.transpose()).inverse();
-  delta_x_ = xd_curr_ * horizon_dt + 0.5 * xdd_des_ * horizon_dt * horizon_dt;
-  double ec_curr = 0.5 * xd_curr_.transpose() * Lambda_ * xd_curr_;
+  delta_x_ = xd_curr_filtered_ * horizon_dt + 0.5 * xdd_des_ * horizon_dt * horizon_dt;
+  double ec_curr = 0.5 * xd_curr_filtered_.transpose() * Lambda_ * xd_curr_filtered_;
   double ec_next = ec_curr + delta_x_.transpose() * Lambda_ * (jdot_qdot_ - J_.data * nonLinearTerms_);
-
-  // Filter estimation of next kinetic energy
-  if (!has_first_command_)
-    ec_next_filtered_ = ec_next;
-  else
-    ec_next_filtered_ = 0.95 * ec_next_filtered_ + 0.05 * ec_next;
-
+  
   // Compute Ec_lim from last_human_pose
   geometry_msgs::PointStamped last_human_pose;
   if (port_human_pos_in_.read(last_human_pose) == RTT::NewData)
@@ -429,8 +431,8 @@ void CartOptCtrl::updateHook(){
 
   // Ec constraint
   A_.block(10,0,1,arm_.getNrOfJoints()) = delta_x_.transpose() * Lambda_ * J_.data * M_inv_.data;
-  ubA_(10) = ec_lim_ - ec_next_filtered_;
-  lbA_(10) = -100000000.0 - ec_next_filtered_;
+  ubA_(10) = ec_lim_ - ec_next;
+  lbA_(10) = -100000000.0 - ec_next;
   
   // Ec limit stream to ROS
   std_msgs::Float32 ec_msg;

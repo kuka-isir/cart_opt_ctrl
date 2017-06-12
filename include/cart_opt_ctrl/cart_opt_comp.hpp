@@ -76,7 +76,7 @@ class CartOptCtrl : public RTT::TaskContext{
     Eigen::Matrix<double,3,1> x_curr_lin_;
     Eigen::Matrix<double,6,6> Lambda_;
     Eigen::Matrix<double,6,1> delta_x_;
-    double ec_next_filtered_;
+    Eigen::Matrix<double,6,1> xd_curr_filtered_;
     
     // For ROS debug
     geometry_msgs::Pose x_des_pos_out_;
