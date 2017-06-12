@@ -57,15 +57,9 @@ class SCurvesTrajComp : public RTT::TaskContext{
     KDL::Frame current_pos_;
     KDL::Twist current_vel_, current_acc_;
     
-    double current_traj_time_, vel_max_, acc_max_, radius_, eqradius_;
+    double vel_max_, acc_max_;
     bool traj_computed_;
     std::string base_frame_;
-      
-    KDL::Path_RoundedComposite* path_;
-    KDL::Trajectory* traject_;
-    KDL::Trajectory_Composite* ctraject_;
-    KDL::VelocityProfile* vel_profile_;
-    KDL::RotationalInterpolation_SingleAxis* interpolator_;
     
     tf::TransformListener* tf_;
     
