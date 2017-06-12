@@ -109,6 +109,7 @@ bool CartOptCtrl::configureHook(){
   x_min_.resize(6);
   joint_pos_vel_.positions.resize(dof);
   joint_pos_vel_.velocities.resize(dof);
+  viscous_coeffs_.resize(6);
   
   // Matices init
   H_.setZero(dof, dof);
@@ -128,6 +129,7 @@ bool CartOptCtrl::configureHook(){
   joint_position_in_.setZero(dof);
   joint_velocity_in_.setZero(dof);
   KDL::SetToZero(integral_error_);
+  viscous_coeffs_.setZero(6);
   
   // Default params
   ee_frame_ = arm_.getSegmentName( arm_.getNrOfSegments() - 1 );
@@ -438,22 +440,14 @@ void CartOptCtrl::updateHook(){
   
   // Viscous walls around cartesian constraints
   if(viscous_walls_){
-    KDL::Twist twist(KDL::Vector(0,0,0),KDL::Vector(0,0,0));
-    Eigen::Matrix<double,6,1> eigen_twist;
-    for(int i=0; i<cart_min_constraints_.size(); i++){
-      if (xd_curr_(i)<0){
-        twist.vel.data[i] = Xd_curr_.vel.data[i];
-        tf::twistKDLToEigen(twist, eigen_twist);
-        g_ +=  2.0* max_viscous_coeff_*(1-1/(1+std::exp(((x_curr_(i)-viscous_walls_thickness_-cart_min_constraints_(i))*(2/-viscous_walls_thickness_)-1)*6)))* regularisation_weight_ * M_inv_.data *J_.data.transpose()* eigen_twist;
-      }
+    viscous_coeffs_;
+    for(int i=0; i<3; i++){
+      if(xd_curr_(i)>0)
+        viscous_coeffs_(i) = max_viscous_coeff_*(1-1/(1+std::exp(((x_curr_(i)+viscous_walls_thickness_-cart_max_constraints_(i))*(2/viscous_walls_thickness_)-1)*6)));
+      else
+        viscous_coeffs_(i) = max_viscous_coeff_*(1-1/(1+std::exp(((x_curr_(i)-viscous_walls_thickness_-cart_min_constraints_(i))*(2/-viscous_walls_thickness_)-1)*6)));
     }
-    for(int i=0; i<cart_max_constraints_.size(); i++){
-      if (xd_curr_(i)>0){
-        twist.vel.data[i] = Xd_curr_.vel.data[i];
-        tf::twistKDLToEigen(twist, eigen_twist);
-        g_ +=  2.0* max_viscous_coeff_*(1-1/(1+std::exp(((x_curr_(i)+viscous_walls_thickness_-cart_max_constraints_(i))*(2/viscous_walls_thickness_)-1)*6)))* regularisation_weight_ * M_inv_.data *J_.data.transpose()* eigen_twist;
-      }
-    }
+    g_ +=  2.0 * regularisation_weight_ * M_inv_.data *J_.data.transpose() * viscous_coeffs_.asDiagonal() * xd_curr_;
   }
   
   // number of allowed compute steps

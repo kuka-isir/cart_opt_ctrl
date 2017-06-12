@@ -107,6 +107,7 @@ class CartOptCtrl : public RTT::TaskContext{
     KDL::Twist integral_error_;
     
     Eigen::VectorXd damping_weight_, cart_min_constraints_, cart_max_constraints_;
+    Eigen::VectorXd viscous_coeffs_;
     double transition_gain_, regularisation_weight_, horizon_steps_;
     double position_saturation_, orientation_saturation_, integral_pos_saturation_, integral_rot_saturation_;
     double max_viscous_coeff_, viscous_walls_thickness_;
