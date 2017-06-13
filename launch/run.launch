@@ -60,13 +60,13 @@
       orientation_saturation : 0.0314
       integral_pos_saturation : 0.0 
       integral_rot_saturation : 0.0
-      ec_max : 0.5
-      ec_safe : 0.02
+      ec_max : 2
+      ec_safe : 1
       human_min_dist : 0.15
       human_max_dist : 4.0
       regularisation_weight : 0.000001
       compensate_gravity : true
-      viscous_walls : true
+      viscous_walls : false
       max_viscous_coeff : 150
       viscous_walls_thickness : 0.3
       damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]

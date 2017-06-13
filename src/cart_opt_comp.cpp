@@ -18,6 +18,9 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addPort("ButtonPressed",port_button_pressed_in_);
   this->addPort("HumanPose",port_human_pos_in_);
   this->addPort("Distance",port_ec_lim_out_);
+  this->addPort("CurrentPose",port_x_curr_);
+  this->addPort("CurrentVel",port_xd_curr_);
+  this->addPort("CurrentAcc",port_xdd_curr_);
   
   // Orocos properties/ROS params
   this->addProperty("frame_of_interest",ee_frame_).doc("The robot frame to track the trajectory");
@@ -244,7 +247,7 @@ void CartOptCtrl::updateHook(){
   x_des_pos_stamped_out_.pose = x_des_pos_out_;
   x_des_pos_stamped_out_.header.frame_id = base_frame_;
   x_des_pos_stamped_out_.header.stamp = rtt_rosclock::host_now();
-  port_x_des_.write(x_des_pos_stamped_out_);
+  port_x_des_.write(x_des_pos_stamped_out_);  
   
   // Debug publish current position and velocity in ROS
   for(int i=0; i< arm_.getNrOfJoints(); i++){
@@ -450,6 +453,20 @@ void CartOptCtrl::updateHook(){
     }
     g_ +=  2.0 * regularisation_weight_ * M_inv_.data *J_.data.transpose() * viscous_coeffs_.asDiagonal() * xd_curr_;
   }
+  
+  // Feedback to traj generator
+  tf::poseKDLToMsg(X_curr_,x_curr_out_);
+  x_curr_stamped_out_.pose = x_curr_out_;
+  x_curr_stamped_out_.header.frame_id = base_frame_;
+  x_curr_stamped_out_.header.stamp = rtt_rosclock::host_now();
+  port_x_curr_.write(x_curr_stamped_out_);
+  
+  tf::twistKDLToMsg(Xd_curr_, xd_curr_out_);
+  port_xd_curr_.write(xd_curr_out_);
+  
+  tf::twistKDLToMsg(Xdd_des_, xdd_curr_out_);
+  port_xdd_curr_.write(xdd_curr_out_);  
+  
   
   // number of allowed compute steps
   int nWSR = 1e6; 

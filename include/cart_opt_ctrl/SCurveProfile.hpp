@@ -1,5 +1,5 @@
-#ifndef SCURVETRAJGEN_SCURVEPROFILE_HPP_
-#define SCURVETRAJGEN_SCURVEPROFILE_HPP_
+#ifndef CARTOPTCTRL_SCURVEPROFILE_HPP_
+#define CARTOPTCTRL_SCURVEPROFILE_HPP_
 
 #include <algorithm>
 
@@ -63,5 +63,5 @@ class SCurveProfile{
     std::vector<double> t_vect_, s_vect_, v_vect_, a_vect_, j_vect_;
 };
 
-#endif //SCURVETRAJGEN_SCURVEPROFILE_HPP_
+#endif //CARTOPTCTRL_SCURVEPROFILE_HPP_
 

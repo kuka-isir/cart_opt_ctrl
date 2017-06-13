@@ -17,23 +17,31 @@ import("rtt_dynamic_reconfigure")
 // Load controller component
 ros.import("cart_opt_ctrl")
 
-loadComponent("KDLTrajCompute","KDLTrajCompute")
-setActivity("KDLTrajCompute",0.001,60,ORO_SCHED_RT)
-loadService("KDLTrajCompute","rosservice")
-KDLTrajCompute.rosservice.connect("updateWaypoints","/KDLTrajCompute/updateWaypoints","cart_opt_ctrl/UpdateWaypoints")
-stream("KDLTrajCompute.PathROSOut",ros.comm.topic("KDLTrajGen/path"))
-stream("KDLTrajCompute.PathPosesROSOut",ros.comm.topic("KDLTrajGen/pose_array"))
-stream("KDLTrajCompute.ButtonPressed",ros.comm.topic("/activate_gravity"))
-loadService("KDLTrajCompute", "reconfigure")
-KDLTrajCompute.reconfigure.min.vel_max = 0.0
-KDLTrajCompute.reconfigure.max.vel_max = 0.5
-KDLTrajCompute.reconfigure.min.acc_max = 0.0
-KDLTrajCompute.reconfigure.max.acc_max = 3.0
-KDLTrajCompute.reconfigure.min.radius = 0.0
-KDLTrajCompute.reconfigure.max.radius = 0.04
-KDLTrajCompute.reconfigure.min.eqradius = 0.0
-KDLTrajCompute.reconfigure.max.eqradius = 0.1
-KDLTrajCompute.reconfigure.advertise("/KDLTrajCompute")
+// loadComponent("KDLTrajCompute","KDLTrajCompute")
+// setActivity("KDLTrajCompute",0.001,60,ORO_SCHED_RT)
+// loadService("KDLTrajCompute","rosservice")
+// KDLTrajCompute.rosservice.connect("updateWaypoints","/KDLTrajCompute/updateWaypoints","cart_opt_ctrl/UpdateWaypoints")
+// stream("KDLTrajCompute.PathROSOut",ros.comm.topic("KDLTrajGen/path"))
+// stream("KDLTrajCompute.PathPosesROSOut",ros.comm.topic("KDLTrajGen/pose_array"))
+// stream("KDLTrajCompute.ButtonPressed",ros.comm.topic("/activate_gravity"))
+// loadService("KDLTrajCompute", "reconfigure")
+// KDLTrajCompute.reconfigure.min.vel_max = 0.0
+// KDLTrajCompute.reconfigure.max.vel_max = 0.5
+// KDLTrajCompute.reconfigure.min.acc_max = 0.0
+// KDLTrajCompute.reconfigure.max.acc_max = 3.0
+// KDLTrajCompute.reconfigure.min.radius = 0.0
+// KDLTrajCompute.reconfigure.max.radius = 0.04
+// KDLTrajCompute.reconfigure.min.eqradius = 0.0
+// KDLTrajCompute.reconfigure.max.eqradius = 0.1
+// KDLTrajCompute.reconfigure.advertise("/KDLTrajCompute")
+
+loadComponent("SCurvesTrajComp","SCurvesTrajComp")
+setActivity("SCurvesTrajComp",0.001,60,ORO_SCHED_RT)
+loadService("SCurvesTrajComp","rosservice")
+SCurvesTrajComp.rosservice.connect("updateWaypoints","/SCurvesTrajComp/updateWaypoints","cart_opt_ctrl/UpdateWaypoints")
+stream("SCurvesTrajComp.PathROSOut",ros.comm.topic("SCurvesTrajComp/path"))
+stream("SCurvesTrajComp.PathPosesROSOut",ros.comm.topic("SCurvesTrajComp/pose_array"))
+stream("SCurvesTrajComp.ButtonPressed",ros.comm.topic("/activate_gravity"))
 
 loadComponent("CartOptCtrl","CartOptCtrl")
 // setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
@@ -44,10 +52,22 @@ CartOptCtrl.rosservice.connect("getCurrentPose","/CartOptCtrl/getCurrentPose","c
 // Connect controller
 connectPeers("CartOptCtrl",getRobotName())
 connectStandardPorts("CartOptCtrl",getRobotName(),ConnPolicy())
-connectPeers("CartOptCtrl","KDLTrajCompute")
-connect("KDLTrajCompute.TrajectoryPointPosOut","CartOptCtrl.TrajectoryPointPosIn",ConnPolicy())
-connect("KDLTrajCompute.TrajectoryPointVelOut","CartOptCtrl.TrajectoryPointVelIn",ConnPolicy())
-connect("KDLTrajCompute.TrajectoryPointAccOut","CartOptCtrl.TrajectoryPointAccIn",ConnPolicy())
+// connectPeers("CartOptCtrl","KDLTrajCompute")
+// connect("KDLTrajCompute.TrajectoryPointPosOut","CartOptCtrl.TrajectoryPointPosIn",ConnPolicy())
+// connect("KDLTrajCompute.TrajectoryPointVelOut","CartOptCtrl.TrajectoryPointVelIn",ConnPolicy())
+// connect("KDLTrajCompute.TrajectoryPointAccOut","CartOptCtrl.TrajectoryPointAccIn",ConnPolicy())
+connectPeers("CartOptCtrl","SCurvesTrajComp")
+connect("SCurvesTrajComp.TrajectoryPointPosOut","CartOptCtrl.TrajectoryPointPosIn",ConnPolicy())
+connect("SCurvesTrajComp.TrajectoryPointVelOut","CartOptCtrl.TrajectoryPointVelIn",ConnPolicy())
+connect("SCurvesTrajComp.TrajectoryPointAccOut","CartOptCtrl.TrajectoryPointAccIn",ConnPolicy())
+connect("CartOptCtrl.CurrentPose","SCurvesTrajComp.CurrentPose",ConnPolicy())
+connect("CartOptCtrl.CurrentVel","SCurvesTrajComp.CurrentVel",ConnPolicy())
+connect("CartOptCtrl.CurrentAcc","SCurvesTrajComp.CurrentAcc",ConnPolicy())
+stream("SCurvesTrajComp.DebugPose",ros.comm.topic("SCurvesTrajComp/PoseDebug"))
+stream("SCurvesTrajComp.DebugVel",ros.comm.topic("SCurvesTrajComp/VelDebug"))
+stream("SCurvesTrajComp.DebugAcc",ros.comm.topic("SCurvesTrajComp/AccDebug"))
+
+
 stream("CartOptCtrl.PoseDesired",ros.comm.topic("CartOptCtrl/PoseDesired"))
 stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
 stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
@@ -56,8 +76,11 @@ stream("CartOptCtrl.HumanPose",ros.comm.topic("/kinect_merge/closest_pt_tracking
 stream("CartOptCtrl.Distance",ros.comm.topic("/cart_opt_ctrl/ec_lim"))
 
 // Configure & start trajectory sender
-configureComponent("KDLTrajCompute")
-startComponent("KDLTrajCompute")
+// configureComponent("KDLTrajCompute")
+// startComponent("KDLTrajCompute")
+
+configureComponent("SCurvesTrajComp")
+startComponent("SCurvesTrajComp")
 
 // Configure & start controller
 configureComponent("CartOptCtrl")

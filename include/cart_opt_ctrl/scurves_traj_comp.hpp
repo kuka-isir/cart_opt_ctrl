@@ -49,11 +49,20 @@ class SCurvesTrajComp : public RTT::TaskContext{
     RTT::OutputPort<nav_msgs::Path> port_path_out_;
     RTT::OutputPort<geometry_msgs::PoseArray> port_pose_array_out_;
     
+    RTT::OutputPort<geometry_msgs::Pose> port_debug_pos_out_;
+    RTT::OutputPort<geometry_msgs::Twist> port_debug_vel_out_, port_debug_acc_out_;
+    
     // Input ports
     RTT::InputPort<bool> port_button_pressed_in_;
+    RTT::InputPort<geometry_msgs::PoseStamped> port_x_curr_;
+    RTT::InputPort<geometry_msgs::Twist> port_xd_curr_;
+    RTT::InputPort<geometry_msgs::Twist> port_xdd_curr_;
+    
+    double save_acc_, save_vel_, save_pose_;
     
     bool button_pressed_;
-    geometry_msgs::PoseArray waypoints_in_;
+    geometry_msgs::PoseStamped goal_pose_, start_pose_, curr_pose_;
+    geometry_msgs::Twist curr_vel_, curr_acc_;
     KDL::Frame current_pos_;
     KDL::Twist current_vel_, current_acc_;
     

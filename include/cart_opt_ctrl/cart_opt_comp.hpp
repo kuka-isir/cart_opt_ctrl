@@ -43,6 +43,9 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::OutputPort<trajectory_msgs::JointTrajectoryPoint> port_joint_pos_vel_in_; 
     RTT::OutputPort<geometry_msgs::Twist> port_error_out_; 
     RTT::OutputPort<std_msgs::Float32> port_ec_lim_out_;
+    RTT::OutputPort<geometry_msgs::PoseStamped> port_x_curr_;
+    RTT::OutputPort<geometry_msgs::Twist> port_xd_curr_;
+    RTT::OutputPort<geometry_msgs::Twist> port_xdd_curr_;
     
     // Input ports
     RTT::InputPort<KDL::Frame> port_pnt_pos_in_;
@@ -83,6 +86,11 @@ class CartOptCtrl : public RTT::TaskContext{
     geometry_msgs::PoseStamped x_des_pos_stamped_out_;
     trajectory_msgs::JointTrajectoryPoint joint_pos_vel_;
     geometry_msgs::Twist error_twist_ros_;
+    
+    // Feedforward to trajectory generator
+    geometry_msgs::Pose x_curr_out_;
+    geometry_msgs::PoseStamped x_curr_stamped_out_;
+    geometry_msgs::Twist xd_curr_out_, xdd_curr_out_;
     
     bool button_pressed_;
 

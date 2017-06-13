@@ -1,4 +1,4 @@
-#include "SCurveProfile.hpp"
+#include <cart_opt_ctrl/SCurveProfile.hpp>
 #include <iostream>
 
 SCurveProfile::SCurveProfile ( double s_init, double vi_init, double a_init, double s_final, double v_final, double a_final, double v_max, double a_max, double j_max ) {
@@ -145,10 +145,12 @@ void SCurveProfile::compute_curves(){
   
   if(ai_ > a_max_)
     while (a_vect_[a_vect_.size()-1]-j_max_*period_>a_max_)
+//     if(a_vect_[a_vect_.size()-1]-j_max_*period_>a_max_)
       compute_next_step(-j_max_);
     
   if(ai_ < -a_max_)
     while (a_vect_[a_vect_.size()-1]+j_max_*period_<-a_max_)
+//     if(a_vect_[a_vect_.size()-1]+j_max_*period_<-a_max_)
       compute_next_step(j_max_);
     
 
@@ -168,6 +170,7 @@ void SCurveProfile::compute_curves(){
   bool on_cruise = (vi_ == v_max_) && (ai_ == 0);
   
   while((break_dist_ <= distance_left) && (break_time_>=0)){
+//   if((break_dist_ <= distance_left) && (break_time_>=0)){
     // If v=vmax and a=0, keep going
     if (on_cruise)
       compute_cruise_step();
@@ -231,10 +234,11 @@ void SCurveProfile::compute_curves(){
   started_breaking = false;
   
   while(t_vect_[t_vect_.size()-1] <=t_final){
+//   if(t_vect_[t_vect_.size()-1] <=t_final){
     // Stop when goal is reached
     if (started_breaking && ((a_vect_[a_vect_.size()-1] < af_ && a_vect_[a_vect_.size()-2] > af_) ||(a_vect_[a_vect_.size()-1] > af_ && a_vect_[a_vect_.size()-2] < af_))){
       compute_next_step(0);
-      break;
+//       break;
     }
     if ( (vf_ >= v_vect_[v_vect_.size()-1] + (af_*af_-a_vect_[a_vect_.size()-1]*a_vect_[a_vect_.size()-1])/(2*j_max_) && (a_vect_[a_vect_.size()-1]<0)) 
       || (vf_ >= v_vect_[v_vect_.size()-1] + (-af_*af_+a_vect_[a_vect_.size()-1]*a_vect_[a_vect_.size()-1])/(2*j_max_) && (a_vect_[a_vect_.size()-1]>0))){

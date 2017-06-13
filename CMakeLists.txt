@@ -7,7 +7,6 @@ set(CMAKE_BUILD_TYPE Release)
 find_package(catkin REQUIRED COMPONENTS
     rtt_ros
     rtt_ros_kdl_tools
-    trac_ik_lib
     kdl_conversions
     eigen_conversions
     cmake_modules
@@ -73,7 +72,7 @@ add_dependencies(send_simple_traj ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_gen
 target_link_libraries(send_simple_traj ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 ## Orocos control and trajectory components
-orocos_component(${PROJECT_NAME} src/cart_opt_comp.cpp src/compute_traj_comp.cpp src/impulse_cart_comp.cpp src/scurves_traj_comp.cpp)
+orocos_component(${PROJECT_NAME} src/cart_opt_comp.cpp src/compute_traj_comp.cpp src/impulse_cart_comp.cpp src/scurves_traj_comp.cpp src/SCurveProfile.cpp)
 set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS RTT_COMPONENT)
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
 
