@@ -26,7 +26,7 @@ def main(argv):
   waypoints.poses.append(resp.current_pose)
   
   pose = Pose()
-  pose.position.x = resp.current_pose.position.x +0.3
+  pose.position.x = resp.current_pose.position.x +0.2
   pose.position.y = resp.current_pose.position.y 
   pose.position.z = resp.current_pose.position.z
   pose.orientation.x = 1.0

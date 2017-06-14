@@ -60,8 +60,8 @@
       orientation_saturation : 0.0314
       integral_pos_saturation : 0.0 
       integral_rot_saturation : 0.0
-      ec_max : 2
-      ec_safe : 1
+      ec_max : 5
+      ec_safe : 4
       human_min_dist : 0.15
       human_max_dist : 4.0
       regularisation_weight : 0.000001

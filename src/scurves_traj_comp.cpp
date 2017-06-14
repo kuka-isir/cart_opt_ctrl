@@ -21,11 +21,13 @@ SCurvesTrajComp::SCurvesTrajComp(const std::string& name) : RTT::TaskContext(nam
   this->addProperty("base_frame",base_frame_).doc("Max cartesian velocity");
   this->addProperty("vel_max",vel_max_).doc("Max cartesian velocity");
   this->addProperty("acc_max",acc_max_).doc("Max cartesian acceleration");
+  this->addProperty("j_max",j_max_).doc("Max cartesian jerk");
   
   // Default params
   base_frame_ = "base_link";
   vel_max_ = 0.5;
   acc_max_ = 2.0;
+  j_max_ = 10;
   
   // Match all properties (defined in the constructor) 
   // with the rosparams in the namespace : 
@@ -49,6 +51,7 @@ bool SCurvesTrajComp::updateWaypoints(cart_opt_ctrl::UpdateWaypoints::Request& r
   
   // Get start pose from the controller
   port_x_curr_.read(start_pose_);
+  tf::poseMsgToKDL(start_pose_.pose, start_pos_kdl_);
   
   
   
@@ -114,48 +117,62 @@ void SCurvesTrajComp::updateHook(){
     tf::twistMsgToKDL(curr_vel_, current_vel_);
     tf::twistMsgToKDL(curr_acc_, current_acc_);
     
-//     double distance = std::sqrt(
-//       std::pow(goal_pose_.pose.position.x-curr_pose_.pose.position.x,2)
-//       + std::pow(goal_pose_.pose.position.y-curr_pose_.pose.position.y,2)
-//       + std::pow(goal_pose_.pose.position.z-curr_pose_.pose.position.z,2));
+
     
-    // TODO   
-//     double distance = std::sqrt(std::pow(goal_pose_.pose.position.x-curr_pose_.pose.position.x,2));
-    double distance = 0.1;
-//     double current_speed = current_vel_.vel.x();
-    double current_speed = save_vel_;
-//     double current_acc = current_acc_.vel.x();
-    double current_acc = save_acc_;
-//     log(RTT::Error) << "Distance to goal : " << distance << endlog();
-//     log(RTT::Error) << "Speed : " << current_speed << endlog();
-//     log(RTT::Error) << "Acc : " << current_acc << endlog();
-    
-    if (save_pose_ <= distance){  
+    if (curr_pose_.pose.position.x <= goal_pose_.pose.position.x){  
+//     if (save_pose_ <= distance){  
       // Update profile
-      scurve_profiler_->config(save_pose_,current_speed,current_acc,distance,0,0,0.5, 1, 20);
+      
+      // TODO
+      double distance = 0.2;
+//       double distance = goal_pose_.pose.position.x - start_pose_.pose.position.x - save_pose_;
+//       double distance = std::sqrt(std::pow(goal_pose_.pose.position.x-curr_pose_.pose.position.x,2));
+//       double current_speed = current_vel_.vel.x();
+      double current_speed = save_vel_;
+//       double current_acc = current_acc_.vel.x();
+      double current_acc = save_acc_;
+      
+      scurve_profiler_->config(save_pose_,current_speed,current_acc,distance, 0, 0, vel_max_, acc_max_, j_max_);
       scurve_profiler_->compute_curves();
+      
+      int nb_steps_computed = scurve_profiler_->s_vect_.size();
+      int dt = std::min(1,nb_steps_computed -1);
+      
       
       // Compute next pose
       //TODO
       tf::poseMsgToKDL(curr_pose_.pose, current_pos_);
+//       save_pose_ = save_pose_ * 0.95 + scurve_profiler_->s_vect_[1]*0.05;
+      save_pose_ = scurve_profiler_->s_vect_[dt];
       current_pos_.p.data[0] = start_pose_.pose.position.x + save_pose_;
-      log(RTT::Error) << "Pose : " << save_pose_ << endlog();
-      save_pose_ = save_pose_ * 0.95 + scurve_profiler_->s_vect_[1]*0.05;
+      current_pos_.p.data[1] = start_pose_.pose.position.y;
+      current_pos_.p.data[2] = start_pose_.pose.position.z;
+      current_pos_.M = start_pos_kdl_.M;
+      
       
       // Compute next speed
       //TODO
-      current_vel_.vel.data[0] = scurve_profiler_->v_vect_[1];
-      log(RTT::Error) << "Vel : " << current_vel_.vel.data[0] << endlog();
-      save_vel_ = save_vel_*0.95 + scurve_profiler_->v_vect_[1]*0.05;
+//       save_vel_ = save_vel_*0.95 + scurve_profiler_->v_vect_[1]*0.05;
+      save_vel_ = scurve_profiler_->v_vect_[dt];
+      current_vel_.vel.data[0] = save_vel_;
+      current_vel_.vel.data[1] = 0;
+      current_vel_.vel.data[2] = 0;
+      current_vel_.rot.data[0] = 0;
+      current_vel_.rot.data[1] = 0;
+      current_vel_.rot.data[2] = 0;
       
       // Compute next acceleration
       //TODO
-      current_acc_.vel.data[0] = scurve_profiler_->a_vect_[1];
-      save_acc_ = save_acc_ *0.95+ scurve_profiler_->a_vect_[1]*0.05;
+//       save_acc_ = save_acc_ *0.95+ scurve_profiler_->a_vect_[1]*0.05;
+      save_acc_ = scurve_profiler_->a_vect_[dt];
+      current_acc_.vel.data[0] = save_acc_;
+      current_acc_.vel.data[1] = 0;
+      current_acc_.vel.data[2] = 0;
+      current_acc_.rot.data[0] = 0;
+      current_acc_.rot.data[1] = 0;
+      current_acc_.rot.data[2] = 0;
       
-      log(RTT::Error) << "Acc : " << current_acc_.vel.data[0] << endlog();
-      log(RTT::Error) << "**************" << endlog();
-      
+      // Print debug via ROS
       geometry_msgs::Twist debug_vel, debug_acc;
       geometry_msgs::Pose debug_pose;
       tf::poseKDLToMsg(current_pos_, debug_pose);

@@ -59,6 +59,8 @@ class SCurvesTrajComp : public RTT::TaskContext{
     RTT::InputPort<geometry_msgs::Twist> port_xdd_curr_;
     
     double save_acc_, save_vel_, save_pose_;
+    KDL::Frame start_pos_kdl_;
+    
     
     bool button_pressed_;
     geometry_msgs::PoseStamped goal_pose_, start_pose_, curr_pose_;
@@ -66,7 +68,7 @@ class SCurvesTrajComp : public RTT::TaskContext{
     KDL::Frame current_pos_;
     KDL::Twist current_vel_, current_acc_;
     
-    double vel_max_, acc_max_;
+    double vel_max_, acc_max_, j_max_;
     bool traj_computed_;
     std::string base_frame_;
     
