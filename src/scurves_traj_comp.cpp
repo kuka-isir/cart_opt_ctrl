@@ -152,8 +152,8 @@ void SCurvesTrajComp::updateHook(){
       
       // Compute next speed
       //TODO
-//       save_vel_ = save_vel_*0.95 + scurve_profiler_->v_vect_[1]*0.05;
-      save_vel_ = scurve_profiler_->v_vect_[dt];
+      save_vel_ = save_vel_*0.95 + scurve_profiler_->v_vect_[dt]*0.05;
+//       save_vel_ = scurve_profiler_->v_vect_[dt];
       current_vel_.vel.data[0] = save_vel_;
       current_vel_.vel.data[1] = 0;
       current_vel_.vel.data[2] = 0;
@@ -163,8 +163,8 @@ void SCurvesTrajComp::updateHook(){
       
       // Compute next acceleration
       //TODO
-//       save_acc_ = save_acc_ *0.95+ scurve_profiler_->a_vect_[1]*0.05;
-      save_acc_ = scurve_profiler_->a_vect_[dt];
+      save_acc_ = save_acc_ *0.95+ scurve_profiler_->a_vect_[dt]*0.05;
+//       save_acc_ = scurve_profiler_->a_vect_[dt];
       current_acc_.vel.data[0] = save_acc_;
       current_acc_.vel.data[1] = 0;
       current_acc_.vel.data[2] = 0;
