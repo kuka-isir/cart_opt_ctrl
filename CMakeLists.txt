@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
     tf
     joint_trajectory_controller
     rtt_roscomm
+    nav_msgs
 )
 
 
