@@ -199,6 +199,7 @@ bool CartOptCtrl::startHook(){
 }
 
 void CartOptCtrl::updateHook(){
+  const int dof = arm_.getNrOfJoints();
   // Read the current state of the robot
   RTT::FlowStatus fp = this->port_joint_position_in_.read(this->joint_position_in_);
   RTT::FlowStatus fv = this->port_joint_velocity_in_.read(this->joint_velocity_in_);
@@ -247,7 +248,7 @@ void CartOptCtrl::updateHook(){
   port_x_des_.write(x_des_pos_stamped_out_);
   
   // Debug publish current position and velocity in ROS
-  for(int i=0; i< arm_.getNrOfJoints(); i++){
+  for(int i=0; i< dof; i++){
     joint_pos_vel_.positions[i] = joint_position_in_(i);
     joint_pos_vel_.velocities[i] = joint_velocity_in_(i);
   }
@@ -363,10 +364,10 @@ void CartOptCtrl::updateHook(){
   double horizon_dt = horizon_steps_* this->getPeriod();
   
   // Joint position and velocity constraints
-  A_.block(0,0,arm_.getNrOfJoints(),arm_.getNrOfJoints()) = M_inv_.data;
+  A_.block(0,0,dof,dof) = M_inv_.data;
 
   // TODO adapt this ??
-//   for( int i; i<arm_.getNrOfJoints(); ++i ){
+//   for( int i; i<dof; ++i ){
 //     if( fabs(current_jnt_vel[i]) < 1.0e-12 ) // avoid division by zero, por favor
 //         continue;
 //     
@@ -385,18 +386,18 @@ void CartOptCtrl::updateHook(){
 //         ddq_upper[i] = fmin( ddq_upper[i], -current_jnt_vel[i] / tlim  ); // ddq <= dq^2 / (2(q-qmax))
 //   }
 
-  lbA_.block(0,0,arm_.getNrOfJoints(),1) = (( qd_min_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMax(
+  lbA_.block(0,0,dof,1) = (( qd_min_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMax(
       2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms_ );
   
-  ubA_.block(0,0,arm_.getNrOfJoints(),1) = (( qd_max_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMin(
+  ubA_.block(0,0,dof,1) = (( qd_max_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMin(
       2*(arm_.getJointUpperLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms_ );
   
   // Cartesian position constraints
-  A_.block(7,0,3,arm_.getNrOfJoints()) = (J_.data*M_inv_.data).block(0,0,3,arm_.getNrOfJoints());
+  A_.block(dof,0,3,dof) = (J_.data*M_inv_.data).block(0,0,3,dof);
   x_max_.block(0,0,3,1) = cart_max_constraints_;
   x_min_.block(0,0,3,1) = cart_min_constraints_;
-  ubA_.block(7,0,3,1) = (2*(x_max_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
-  lbA_.block(7,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);  
+  ubA_.block(dof,0,3,1) = (2*(x_max_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
+  lbA_.block(dof,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);  
   
   // Filter current speed for kinetic energy computation
   if (!has_first_command_)
@@ -430,9 +431,9 @@ void CartOptCtrl::updateHook(){
     ec_lim_ = 1;
 
   // Ec constraint
-  A_.block(10,0,1,arm_.getNrOfJoints()) = delta_x_.transpose() * Lambda_ * J_.data * M_inv_.data;
-  ubA_(10) = ec_lim_ - ec_next;
-  lbA_(10) = -100000000.0 - ec_next;
+  A_.block(dof + 3 ,0,1,dof) = delta_x_.transpose() * Lambda_ * J_.data * M_inv_.data;
+  ubA_(dof + 3) = ec_lim_ - ec_next;
+  lbA_(dof + 3) = -100000000.0 - ec_next;
   
   // Ec limit stream to ROS
   std_msgs::Float32 ec_msg;
