@@ -7,6 +7,6 @@ d = generate_distutils_setup()
 
 d['packages'] = ['cart_opt_ctrl']
 d['package_dir'] = {'': 'src'}
-d['install_requires'] = []
+#d['install_requires'] = []
 
 setup(**d)

@@ -90,3 +90,8 @@ target_link_libraries(${PROJECT_NAME}
 
 orocos_install_headers(DIRECTORY include/${PROJECT_NAME})
 orocos_generate_package(INCLUDE_DIRS include)
+
+install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(DIRECTORY scripts DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+catkin_install_python(PROGRAMS src/cart_opt_ctrl/back_n_forth.py src/cart_opt_ctrl/simple_traj_script.py
+                      DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
