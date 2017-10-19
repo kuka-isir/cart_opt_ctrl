@@ -19,7 +19,8 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addPort("HumanPose",port_human_pos_in_);
   this->addPort("Ec_lim",port_ec_lim_out_);
   this->addPort("Ec_predicted",port_ec_predicted_out_);
-  
+  this->addPort("FTData",port_ftdata_);  
+
   // Orocos properties/ROS params
   this->addProperty("frame_of_interest",ee_frame_).doc("The robot frame to track the trajectory");
   this->addProperty("base_frame",base_frame_).doc("The robot frame to track the trajectory");
@@ -495,6 +496,28 @@ void CartOptCtrl::updateHook(){
   }
   else
     log(RTT::Error) << "QPOases failed!" << endlog();
+
+  // Compensate for an added load
+  if (button_pressed_){
+    if(port_ftdata_.read(ft_msg_) == NoData)
+    {
+	log(Error) << "No FT Data received" << endlog();
+	this->error();
+    }
+
+    KDL::Wrench wrench_kdl;
+    tf::wrenchMsgToKDL(ft_msg_.wrench,wrench_kdl);
+
+    arm_.setExternalMeasuredWrench(wrench_kdl,arm_.getSegmentIndex(ee_frame_));
+
+    arm_.computeExternalWrenchTorque(joint_position_in_,true);
+
+    KDL::JntArray& ext_t = arm_.getExternalWrenchTorque();
+
+    log(Debug) << "External torque : "<<ext_t.data.transpose()<<endlog();
+
+    joint_torque_out_ += ext_t.data;
+  }
 
   // Send torques to the robot
   port_joint_torque_out_.write(joint_torque_out_);
