@@ -42,7 +42,7 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::OutputPort<geometry_msgs::PoseStamped> port_x_des_;
     RTT::OutputPort<trajectory_msgs::JointTrajectoryPoint> port_joint_pos_vel_in_; 
     RTT::OutputPort<geometry_msgs::Twist> port_error_out_; 
-    RTT::OutputPort<std_msgs::Float32> port_ec_lim_out_;
+    RTT::OutputPort<std_msgs::Float32> port_ec_lim_out_, port_ec_predicted_out_;
     
     // Input ports
     RTT::InputPort<KDL::Frame> port_pnt_pos_in_;

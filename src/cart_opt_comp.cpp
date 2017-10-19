@@ -17,7 +17,8 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addPort("PoseErrorOut",port_error_out_);
   this->addPort("ButtonPressed",port_button_pressed_in_);
   this->addPort("HumanPose",port_human_pos_in_);
-  this->addPort("Distance",port_ec_lim_out_);
+  this->addPort("Ec_lim",port_ec_lim_out_);
+  this->addPort("Ec_predicted",port_ec_predicted_out_);
   
   // Orocos properties/ROS params
   this->addProperty("frame_of_interest",ee_frame_).doc("The robot frame to track the trajectory");
@@ -425,7 +426,7 @@ void CartOptCtrl::updateHook(){
     if (distance_to_contact_ >= human_max_dist_)
       ec_lim_ = ec_max_;
     if ((distance_to_contact_ < human_max_dist_)&&(distance_to_contact_>human_min_dist_))
-      ec_lim_ = distance_to_contact_ * (ec_max_-ec_safe_)/(human_max_dist_-human_min_dist_);
+      ec_lim_ = ec_safe_ + (distance_to_contact_-human_min_dist_) * (ec_max_-ec_safe_)/(human_max_dist_-human_min_dist_);
   }
   else
     ec_lim_ = 1;
@@ -482,6 +483,13 @@ void CartOptCtrl::updateHook(){
   if(ret == qpOASES::SUCCESSFUL_RETURN){
     // Get the solution
     qpoases_solver_->getPrimalSolution(joint_torque_out_.data());
+    
+    // Stream Ec_predicted
+    double ec_predicted = delta_x_.transpose() * Lambda_ * J_.data * M_inv_.data* joint_torque_out_ + ec_next;
+    std_msgs::Float32 ec_predicted_msg;
+    ec_predicted_msg.data = ec_predicted;
+    port_ec_predicted_out_.write(ec_predicted_msg);
+    
     // Remove gravity because Kuka already adds it
     joint_torque_out_ -= arm_.getGravityTorque().data;
   }

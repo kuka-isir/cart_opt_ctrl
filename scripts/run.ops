@@ -40,6 +40,9 @@ loadComponent("CartOptCtrl","CartOptCtrl")
 setActivity("CartOptCtrl",0.001,50,ORO_SCHED_RT)
 loadService("CartOptCtrl","rosservice")
 CartOptCtrl.rosservice.connect("getCurrentPose","/CartOptCtrl/getCurrentPose","cart_opt_ctrl/GetCurrentPose")
+loadService("CartOptCtrl", "reconfigure")
+CartOptCtrl.reconfigure.advertise("/CartOptCtrl")
+
 
 // Connect controller
 connectPeers("CartOptCtrl",getRobotName())
@@ -53,7 +56,8 @@ stream("CartOptCtrl.JointPosVelIn",ros.comm.topic("CartOptCtrl/JointPosVelIn"))
 stream("CartOptCtrl.PoseErrorOut",ros.comm.topic("CartOptCtrl/PoseError"))
 stream("CartOptCtrl.ButtonPressed",ros.comm.topic("/activate_gravity"))
 stream("CartOptCtrl.HumanPose",ros.comm.topic("/kinect_merge/closest_pt_tracking"))
-stream("CartOptCtrl.Distance",ros.comm.topic("/cart_opt_ctrl/ec_lim"))
+stream("CartOptCtrl.Ec_lim",ros.comm.topic("/cart_opt_ctrl/ec_lim"))
+stream("CartOptCtrl.Ec_predicted",ros.comm.topic("/cart_opt_ctrl/ec_predicted"))
 
 // Configure & start trajectory sender
 configureComponent("KDLTrajCompute")
