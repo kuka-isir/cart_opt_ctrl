@@ -55,15 +55,15 @@
       joint_vel_max : [1.8, 1.8, 2.0, 2.0, 3.5, 3.0, 3.0]
       p_gains : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
       i_gains : [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-      d_gains : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
+      d_gains : [20.0, 20.0, 20.0, 20.0, 20.0, 20.0]
       position_saturation : 0.01
       orientation_saturation : 0.0314
       integral_pos_saturation : 0.0 
       integral_rot_saturation : 0.0
-      ec_max : 0.5
-      ec_safe : 0.02
-      human_min_dist : 0.15
-      human_max_dist : 4.0
+      ec_max : 1.0
+      ec_safe : 0.05
+      human_min_dist : 0.25
+      human_max_dist : 2.8
       regularisation_weight : 0.000001
       compensate_gravity : true
       viscous_walls : true
@@ -92,8 +92,8 @@
     <!--============ KDLTrajCompute Params ============-->
     <rosparam ns="KDLTrajCompute" subst_value="true">
       base_frame : $(arg root_link)
-      vel_max : 0.1
-      acc_max : 2.0
+      vel_max : 0.7
+      acc_max : 0.5
       radius : 0.01
       eqradius : 0.05
     </rosparam>

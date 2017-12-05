@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 2.8.3)
 project(cart_opt_ctrl)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-set(CMAKE_BUILD_TYPE Release)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
 
 find_package(catkin REQUIRED COMPONENTS
     rtt_ros
@@ -25,6 +28,7 @@ find_package(catkin REQUIRED COMPONENTS
     tf
     joint_trajectory_controller
     rtt_roscomm
+    nav_msgs
 )
 
 
@@ -86,3 +90,8 @@ target_link_libraries(${PROJECT_NAME}
 
 orocos_install_headers(DIRECTORY include/${PROJECT_NAME})
 orocos_generate_package(INCLUDE_DIRS include)
+
+install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(DIRECTORY scripts DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+catkin_install_python(PROGRAMS src/cart_opt_ctrl/back_n_forth.py src/cart_opt_ctrl/simple_traj_script.py
+                      DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

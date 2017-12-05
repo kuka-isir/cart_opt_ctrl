@@ -14,6 +14,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/WrenchStamped.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Float32.h>
@@ -42,7 +43,7 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::OutputPort<geometry_msgs::PoseStamped> port_x_des_;
     RTT::OutputPort<trajectory_msgs::JointTrajectoryPoint> port_joint_pos_vel_in_; 
     RTT::OutputPort<geometry_msgs::Twist> port_error_out_; 
-    RTT::OutputPort<std_msgs::Float32> port_ec_lim_out_;
+    RTT::OutputPort<std_msgs::Float32> port_ec_lim_out_, port_ec_predicted_out_;
     
     // Input ports
     RTT::InputPort<KDL::Frame> port_pnt_pos_in_;
@@ -52,6 +53,7 @@ class CartOptCtrl : public RTT::TaskContext{
     RTT::InputPort<Eigen::VectorXd> port_joint_velocity_in_;
     RTT::InputPort<bool> port_button_pressed_in_;
     RTT::InputPort<geometry_msgs::PointStamped> port_human_pos_in_;
+    RTT::InputPort<geometry_msgs::WrenchStamped> port_ftdata_;
     
     KDL::Jacobian J_;
     KDL::JntSpaceInertiaMatrix M_inv_;
@@ -83,6 +85,7 @@ class CartOptCtrl : public RTT::TaskContext{
     geometry_msgs::PoseStamped x_des_pos_stamped_out_;
     trajectory_msgs::JointTrajectoryPoint joint_pos_vel_;
     geometry_msgs::Twist error_twist_ros_;
+    geometry_msgs::WrenchStamped ft_msg_;
     
     bool button_pressed_;
 

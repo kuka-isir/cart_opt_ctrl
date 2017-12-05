@@ -33,7 +33,9 @@
   <build_depend>message_generation</build_depend>
   <build_depend>joint_trajectory_controller</build_depend>
   <build_depend>controller_manager</build_depend>
-  
+  <build_depend>nav_msgs</build_depend>
+
+  <run_depend>nav_msgs</run_depend>
   <run_depend>controller_manager</run_depend>
   <run_depend>joint_trajectory_controller</run_depend>
   <run_depend>rtt_ros_kdl_tools</run_depend>
