@@ -24,6 +24,8 @@
 #include <nav_msgs/Path.h>
 #include <cart_opt_ctrl/UpdateWaypoints.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/Float64MultiArray.h>
+
 
 class KDLTrajCompute : public RTT::TaskContext{
   public:
@@ -48,8 +50,10 @@ class KDLTrajCompute : public RTT::TaskContext{
     
     // Input ports
     RTT::InputPort<std_msgs::Bool> port_button_pressed_in_;
+    RTT::InputPort<std_msgs::Float64MultiArray> port_norm_error_in;
     
     std_msgs::Bool button_pressed_msg_;
+    std_msgs::Float64MultiArray norm_error_msg_;
     geometry_msgs::PoseArray waypoints_in_;
     KDL::Frame current_pos_;
     KDL::Twist current_vel_, current_acc_;

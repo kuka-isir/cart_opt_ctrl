@@ -23,6 +23,8 @@ find_package(catkin REQUIRED COMPONENTS
     message_generation
     geometry_msgs
     krl_msgs
+    rtt_roscomm
+    dynamic_reconfigure
 )
 
 
@@ -54,6 +56,10 @@ catkin_package(
   CATKIN_DEPENDS message_runtime
 )
 
+# Orocos typekits
+ros_generate_rtt_typekit(cart_opt_ctrl)
+ros_generate_rtt_service_proxies(cart_opt_ctrl)
+
 ## ROS control and trajectory nodes
 add_executable(kdl_trajectory_sender src/kdl_trajectory_sender.cpp)
 target_link_libraries(kdl_trajectory_sender ${catkin_LIBRARIES} ${Boost_LIBRARIES})
@@ -61,6 +67,11 @@ add_library(cart_opt_controllers src/cart_opt_controller.cpp)
 target_link_libraries(cart_opt_controllers ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 add_executable(send_simple_traj src/send_simple_traj.cpp)
 target_link_libraries(send_simple_traj ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+# add_library(kpa101 src/kpa101.cpp)
+
+orocos_generate_package(
+)
 
 ## Orocos control and trajectory components
 orocos_component(${PROJECT_NAME} src/cart_opt_comp.cpp src/compute_traj_comp.cpp src/impulse_cart_comp.cpp)
@@ -71,7 +82,12 @@ target_link_libraries(${PROJECT_NAME}
    ${orocos_kdl_LIBRARIES}
    ${kdl_conversions_LIBRARIES}
    ${USE_OROCOS_LIBRARIES}
+#    kpa101
 )
 
 orocos_install_headers(DIRECTORY include/${PROJECT_NAME})
-orocos_generate_package(INCLUDE_DIRS include)
+orocos_generate_package(
+  INCLUDE_DIRS include
+  DEPENDS my_msgs
+  DEPENDS_TARGETS rtt_roscomm
+)

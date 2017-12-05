@@ -1,0 +1,135 @@
+// Import base script
+import("rtt_rospack")
+runScript(ros.find("lwr_utils")+"/scripts/utils.ops")
+
+// Load robot
+loadRobot(getRobotName(),isSim(),true)
+loadStatePublisher(true)
+
+// Set initial robot configuration
+if (isSim()) then
+  setRobotInitialJointConfiguration(1.0,0.,0.0,-1.57,0.0,1.57,0)
+setJointTorqueControlMode()
+
+import("rtt_ros")
+
+// Load controller component
+ros.import("cart_opt_ctrl")
+loadComponent("KDLTrajCompute","KDLTrajCompute")
+setActivity("KDLTrajCompute",0.001,HighestPriority,ORO_SCHED_RT)
+loadService("KDLTrajCompute","rosservice")
+KDLTrajCompute.rosservice.connect("updateWaypoints","/KDLTrajCompute/updateWaypoints","cart_opt_ctrl/UpdateWaypoints")
+stream("KDLTrajCompute.PathROSOut",ros.comm.topic("KDLTrajGen/path"))
+stream("KDLTrajCompute.PathPosesROSOut",ros.comm.topic("KDLTrajGen/pose_array"))
+stream("KDLTrajCompute.ButtonPressed",ros.comm.topic("activate_gravity"))
+
+
+
+// Load KPA101 Reader
+// loadComponent("read_detector","read_detector")
+// setActivity("read_detector",0.001,LowestPriority+1,ORO_SCHED_RT)
+// loadService("read_detector","rosservice")
+// stream("read_detector.LaserInfo",ros.comm.topic("LaserInfo"))
+// stream("read_detector.Ec",ros.comm.topic("CartOptCtrl/Ec_constraint"))
+// stream("read_detector.Ec_lim",ros.comm.topic("Ec_lim"))
+// stream("read_detector.p_ec",ros.comm.topic("p_ec"))
+// stream("read_detector.r_ec",ros.comm.topic("r_ec"))
+
+
+loadComponent("CartOptCtrl","CartOptCtrl")
+// setActivity("CartOptCtrl",0.001,HighestPriority-3,ORO_SCHED_RT)
+setActivity("CartOptCtrl",0.001,LowestPriority,ORO_SCHED_RT)
+loadService("CartOptCtrl","rosservice")
+CartOptCtrl.rosservice.connect("getCurrentPose","/CartOptCtrl/getCurrentPose","cart_opt_ctrl/GetCurrentPose")
+
+
+
+
+// Connect controller
+connectPeers("CartOptCtrl",getRobotName())
+connectStandardPorts("CartOptCtrl",getRobotName(),ConnPolicy())
+connectPeers("CartOptCtrl","KDLTrajCompute")
+connect("KDLTrajCompute.TrajectoryPointPosOut","CartOptCtrl.TrajectoryPointPosIn",ConnPolicy())
+connect("KDLTrajCompute.TrajectoryPointVelOut","CartOptCtrl.TrajectoryPointVelIn",ConnPolicy())
+connect("KDLTrajCompute.TrajectoryPointAccOut","CartOptCtrl.TrajectoryPointAccIn",ConnPolicy())
+
+stream("CartOptCtrl.PoseEEDesired",ros.comm.topic("CartOptCtrl/PoseEEDesired"))
+stream("CartOptCtrl.PoseEECurrent",ros.comm.topic("CartOptCtrl/PoseEECurrent"))
+stream("CartOptCtrl.PoseTarget",ros.comm.topic("CartOptCtrl/PoseTarget"))
+stream("CartOptCtrl.PoseO0OM",ros.comm.topic("CartOptCtrl/PoseO0OM"))
+stream("CartOptCtrl.PoseXmError",ros.comm.topic("CartOptCtrl/PoseXmError"))
+stream("CartOptCtrl.PoseXError",ros.comm.topic("CartOptCtrl/PoseXError"))
+stream("CartOptCtrl.Ec_constraint",ros.comm.topic("CartOptCtrl/Ec_constraint"))
+stream("CartOptCtrl.Data_Thomas",ros.comm.topic("CartOptCtrl/Data_Thomas"))
+stream("CartOptCtrl.XddDes",ros.comm.topic("CartOptCtrl/XddDes"))
+stream("CartOptCtrl.Xdd_des_const",ros.comm.topic("CartOptCtrl/Xdd_des_const"))
+stream("CartOptCtrl.Xd_Out",ros.comm.topic("CartOptCtrl/Xd_Out"))
+stream("CartOptCtrl.Xd_curr_",ros.comm.topic("CartOptCtrl/Xd_curr_"))
+stream("CartOptCtrl.positioning_error",ros.comm.topic("CartOptCtrl/positioning_error"))
+stream("CartOptCtrl.pointing_error",ros.comm.topic("CartOptCtrl/pointing_error"))
+stream("CartOptCtrl.Xdd_out",ros.comm.topic("CartOptCtrl/Xdd_out"))
+stream("CartOptCtrl.Integral_term",ros.comm.topic("CartOptCtrl/Integral_term"))
+stream("CartOptCtrl.FTSensor",ros.comm.topic("ft_sensor/wrench"))
+stream("CartOptCtrl.Jm",ros.comm.topic("Jm"))
+stream("CartOptCtrl.J",ros.comm.topic("J"))
+
+
+// stream("CartOptCtrl.Encoder",ros.comm.topic("EncoderData"))
+// stream("CartOptCtrl.PolarisSensor",ros.comm.topic("polaris_sensor/targets"))
+
+
+//Dynamic reconfigure of trajectory parameters
+import("rtt_dynamic_reconfigure")
+loadService("KDLTrajCompute", "reconfigure")
+
+KDLTrajCompute.reconfigure.min.vel_max = 0.0
+KDLTrajCompute.reconfigure.max.vel_max = 0.5
+KDLTrajCompute.reconfigure.min.acc_max = 0.0
+KDLTrajCompute.reconfigure.max.acc_max = 3.0
+KDLTrajCompute.reconfigure.min.radius = 0.0
+KDLTrajCompute.reconfigure.max.radius = 0.04
+KDLTrajCompute.reconfigure.min.eqradius = 0.0
+KDLTrajCompute.reconfigure.max.eqradius = 0.1
+KDLTrajCompute.reconfigure.advertise("/KDLTrajCompute")
+
+//Dynamic reconfigure of trajectory parameters
+loadService("CartOptCtrl", "reconfigure")
+CartOptCtrl.reconfigure.min.Ec_lim = 0.02
+CartOptCtrl.reconfigure.max.Ec_lim = 5
+CartOptCtrl.reconfigure.min.F_lim = 20
+CartOptCtrl.reconfigure.max.F_lim = 100
+CartOptCtrl.reconfigure.min.integral_ori_saturation = 0
+CartOptCtrl.reconfigure.max.integral_ori_saturation = 100
+CartOptCtrl.reconfigure.min.integral_pos_saturation = 0
+CartOptCtrl.reconfigure.max.integral_pos_saturation = 100
+CartOptCtrl.reconfigure.min.regularisation_weight = 0
+CartOptCtrl.reconfigure.max.regularisation_weight = 1e-9
+CartOptCtrl.reconfigure.min.position_saturation = 0
+CartOptCtrl.reconfigure.max.position_saturation = 0.1
+CartOptCtrl.reconfigure.min.orientation_saturation = 0
+CartOptCtrl.reconfigure.max.orientation_saturation = 0.1
+CartOptCtrl.reconfigure.min.X_target = 0
+CartOptCtrl.reconfigure.max.X_target = 1
+CartOptCtrl.reconfigure.min.Y_target = 0
+CartOptCtrl.reconfigure.max.Y_target = 1
+CartOptCtrl.reconfigure.min.Z_target = 0
+CartOptCtrl.reconfigure.max.Z_target = 1
+CartOptCtrl.reconfigure.advertise("/CartOptCtrl")
+
+
+
+// Configure & start encoder listener
+// configureComponent("EncoderListener")
+// startComponent("EncoderListener")
+
+// Configure & start trajectory sender
+configureComponent("KDLTrajCompute")
+startComponent("KDLTrajCompute")
+
+// Configure & start read_sensor
+// configureComponent("read_detector")
+// startComponent("read_detector")
+
+// Configure & start controller
+configureComponent("CartOptCtrl")
+startComponent("CartOptCtrl")

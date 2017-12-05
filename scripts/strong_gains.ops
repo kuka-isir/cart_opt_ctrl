@@ -1,0 +1,7 @@
+//runScript("/home/lucas/lj_ws/src/cart_opt_ctrl/scripts/strong_gains.ops")
+
+var array new_p_gains = array(3500.,3500.,3500.,3500.,3500.,3500.)
+var array new_d_gains = array(20.,20.,20.,20.,20.,20.)
+
+CartOptCtrl.p_gains = new_p_gains
+CartOptCtrl.d_gains = new_d_gains

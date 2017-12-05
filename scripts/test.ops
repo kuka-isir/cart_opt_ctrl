@@ -1,0 +1,7 @@
+//runScript("/home/jimmy/test.ops")
+
+var array new_p_gains = array(1.,1.,1.,1.,1.,1.)
+var array new_d_gains = array(1.,1.,1.,1.,1.,1.)
+
+CartOptCtrl.p_gains = new_p_gains
+CartOptCtrl.d_gains = new_d_gains

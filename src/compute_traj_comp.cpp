@@ -16,6 +16,7 @@ KDLTrajCompute::KDLTrajCompute(const std::string& name) : RTT::TaskContext(name)
   this->addPort("PathROSOut",port_path_out_);
   this->addPort("PathPosesROSOut",port_pose_array_out_);
   this->addPort("ButtonPressed",port_button_pressed_in_);
+  this->addPort("NormErrorIn",port_norm_error_in);
   this->addOperation("updateWaypoints",&KDLTrajCompute::updateWaypoints,this,RTT::ClientThread);
   
   this->addProperty("vel_max",vel_max_).doc("Max cartesian velocity");
@@ -81,11 +82,24 @@ void KDLTrajCompute::updateHook(){
       port_pnt_acc_out_.write(current_acc_);
       
       // Increase timer
-      current_traj_time_ += this->getPeriod();
+//       if(this->port_norm_error_in.read(norm_error_msg_) != RTT::NoData){
+// 	if (norm_error_msg_.data[0] < 0.0005 and norm_error_msg_.data[1] < 0.0002){
+	  current_traj_time_ += this->getPeriod();
+// 	  cout << "go to next point" << endl;
+// 	}
+//       }
     }
     else{
       traj_computed_ = false;
       current_traj_time_ = 0.0;
+      current_acc_.vel.x(0);
+      current_acc_.vel.y(0);
+      current_acc_.vel.z(0);
+      current_acc_.rot.x(0);
+      current_acc_.rot.y(0);
+      current_acc_.rot.z(0);
+      port_pnt_acc_out_.write(current_acc_);
+      
     }
   }
 }
@@ -111,7 +125,7 @@ bool KDLTrajCompute::computeTrajectory(){
     // Wait at the end of the trajectory
     ctraject_ = new KDL::Trajectory_Composite();
     ctraject_->Add(traject_);
-    ctraject_->Add(new KDL::Trajectory_Stationary(0.1,frame));
+//     ctraject_->Add(new KDL::Trajectory_Statioxnary(0.1,frame));
     
     // Publish a displayable path to ROS
     publishTrajectory();

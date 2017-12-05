@@ -30,6 +30,7 @@
   <build_depend>control_msgs</build_depend>
   <build_depend>trajectory_msgs</build_depend>
   <build_depend>qpOASES</build_depend>
+  <build_depend>serial</build_depend>
   <build_depend>message_generation</build_depend>
 
   <run_depend>rtt_ros_kdl_tools</run_depend>
@@ -49,6 +50,7 @@
   <run_depend>control_msgs</run_depend>
   <run_depend>trajectory_msgs</run_depend>
   <run_depend>qpOASES</run_depend>
+  <run_depend>serial</run_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>rospy</run_depend>
 
@@ -67,7 +69,6 @@
       <plugin_depend>rtt_rospack</plugin_depend>
       <plugin_depend>rtt_nav_msgs</plugin_depend>
       <plugin_depend>rtt_trajectory_msgs</plugin_depend>
-      <plugin_depend>rtt_cart_opt_ctrl</plugin_depend>
     </rtt_ros>
     <controller_interface plugin="${prefix}/ros_control_plugins.xml"/>
   </export>

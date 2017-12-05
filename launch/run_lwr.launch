@@ -21,7 +21,7 @@
   <!-- The end effector frame (you'll be able to use frames <= tip_link for cartesian position, jacobians etc.) -->
   <arg name="tip_link" default="ati_link"/>
   <!-- The root_link will be frame used for sending goals to the cartesian controller -->
-  <arg name="root_link" default="base_link"/>
+  <arg name="root_link" default="table_link"/>
   <!-- Run Simulated robot (need to 'roslaunch rtt_lwr_gazebo lwr_gazebo.launch' first) -->
   <arg name="sim" default="false" />
   <!-- The global namespace if you need to change it (unlikely) -->
@@ -36,63 +36,60 @@
   <arg name="load_base" default="true" />
   <arg name="load_table" default="true" />
   <arg name="load_laser" default="false" />
-  <arg name="load_weight" default="false" />
   <arg name="load_ati_sensor" default="true" />
+  <arg name="load_weight" default="false" />
   <arg name="load_handle" default="true" />
   <arg name="load_calib_tool" default="false" />
   <!-- Gazebo -->
   <arg name="gazebo_gui" default="false"/>
-  
+
   <!-- Arg to use ros_control instead of a orocos component, not fully supported yet -->
-  <arg name="use_ros_control" default="false"/> 
-  
+  <arg name="use_ros_control" default="false"/>
+
   <group unless="$(arg use_ros_control)">
-  <!--============ CartOptCtrl Params ============-->
-    <rosparam ns="CartOptCtrl" subst_value="true">
+ <!--============ CartOptCtrl Params ============-->
+     <rosparam ns="CartOptCtrl" subst_value="true">
+      frame_of_interest : $(arg tip_link)
+
       torque_max : [160.0, 160.0, 85.0, 85.0, 85.0, 28.0, 28.0]
       joint_vel_max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-    
-      <!--PD-->
-      <!--p_gains : [1080.0, 1080.0, 1080.0, 3500.0, 3500.0, 3500.0]
-      d_gains : [12.0, 12.0, 12.0, 30.0, 30.0, 30.0]
-      i_gains : [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-      integral_saturation : 0-->
-      
 
       <!--PID-->
-      p_gains : [3000.0, 3000.0, 3000.0, 4500.0, 4500.0, 4500.0] 
-      d_gains : [27.3, 27.3, 27.3, 22.4, 22.4, 22.4]
+
+      p_gains : [3500.0, 3500.0, 3500.0, 4000.0, 4000.0, 4000.0]
+      d_gains : [25.3, 25.3, 25.3, 20.4, 20.4, 20.4]
       i_gains : [6.4610, 6.4610, 6.4610, 25.0, 25.0, 25.0]
-      integral_pos_saturation : 1
-      integral_ori_saturation : 50
-      position_saturation : 0.01
+
+
+      X_target : 0.55656
+      Y_target : 0
+      Z_target : 0.0
+
+      position_saturation : 0.02
       orientation_saturation : 0.03
-      Ec_lim : 1.0
-      F_lim : 100
+      position_saturation : 0.1
+      orientation_saturation : 0.1
+
+      Ec_lim : 0.25
+      F_lim : 50
       horizon : 15
       regularisation_weight : 0.000001
+
+      start_pointing : false
+
       compensate_gravity : true
-      static_pointing : false
       damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-      frame_of_interest : "ati_link"
-      select_components_0 : [1,1,1,1,1,1]
-      select_axes_0 : [1,1,1,1,1,1,1]
-      select_components_1 : [0,0,0,0,0,0]
-      select_axes_1 : [0,0,0,0,0,0,0]
-      select_components_2 : [0,0,0,0,0,0]
-      select_axes_2 : [0,0,0,0,0,0,0]
-      select_components_3 : [0,0,0,0,0,0]
-      select_axes_3 : [0,0,0,0,0,0,0]
-      select_components_4 : [0,0,0,0,0,0]
-      select_axes_4 : [0,0,0,0,0,0,0]
-      select_components_5 : [0,0,0,0,0,0]
-      select_axes_5 : [0,0,0,0,0,0,0]
     </rosparam>
-    
+
+
+    <rosparam ns="Deployer" subst_value="true">
+       spinner_threads : 20
+    </rosparam>
+
     <!--============ KDLTrajCompute Params ============-->
     <rosparam ns="KDLTrajCompute" subst_value="true">
-      vel_max : 1.0
-      acc_max : 2.0
+      vel_max : 0.1
+      acc_max : 0.5
       radius : 0.01
       eqradius : 0.05
     </rosparam>
@@ -100,7 +97,7 @@
 
   <!--============ LWR Runner script ===============-->
 
-  <include file="$(find lwr_utils)/launch/run.launch">
+  <include file="$(find lwr_utils)/launch/run_lwr.launch">
     <arg name="sim" value="$(arg sim)" />
     <arg if="$(arg use_ros_control)" name="ops_script" value="$(find cart_opt_ctrl)/scripts/run_ros_control.ops"/>
     <arg unless="$(arg use_ros_control)" name="ops_script" value="$(find cart_opt_ctrl)/scripts/run.ops"/>
@@ -114,12 +111,13 @@
     <arg name="load_base" value="$(arg load_base)" />
     <arg name="load_table" value="$(arg load_table)" />
     <arg name="load_weight" value="$(arg load_weight)" />
-    <arg name="load_laser" value="$(arg load_laser)" />    
+    <arg name="load_laser" value="$(arg load_laser)" />
     <arg name="load_ati_sensor" value="$(arg load_ati_sensor)" />
     <arg name="load_calib_tool" value="$(arg load_calib_tool)" />
     <arg name="load_handle" value="$(arg load_handle)" />
     <arg name="gazebo_gui" value="$(arg gazebo_gui)"/>
   </include>
+
 
   <group if="$(arg use_ros_control)">
     <arg name="launch_moveit" default="true"/>
