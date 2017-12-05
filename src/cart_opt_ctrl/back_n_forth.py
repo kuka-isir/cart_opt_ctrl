@@ -20,10 +20,10 @@ def main(argv):
     exit(0)
 
   waypoints = PoseArray()
-  waypoints.header.frame_id = "base_link"
-  
+  waypoints.header.frame_id = rospy.get_param("root_link")
+
   waypoints.poses.append(resp.current_pose)
-  
+
   pose = Pose()
   pose.position.x = 0.45
   pose.position.y = 0.2
@@ -46,7 +46,7 @@ def main(argv):
 
   client = rospy.ServiceProxy('/KDLTrajCompute/updateWaypoints', UpdateWaypoints)
   req = UpdateWaypointsRequest();
-  
+
   while not rospy.is_shutdown():
     resp = client_pose_current(request_pose);
     waypoints.poses[:] = []
@@ -54,7 +54,7 @@ def main(argv):
     waypoints.poses.append(pose)
     req.waypoints = waypoints;
     client.call(req)
-    
+
     resp = client_pose_current(request_pose);
     waypoints.poses[:] = []
     waypoints.poses.append(resp.current_pose)

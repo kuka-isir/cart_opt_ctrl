@@ -18,7 +18,7 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addPort("ButtonPressed",port_button_pressed_in_);
   this->addPort("HumanPose",port_human_pos_in_);
   this->addPort("Distance",port_ec_lim_out_);
-  
+
   // Orocos properties/ROS params
   this->addProperty("frame_of_interest",ee_frame_).doc("The robot frame to track the trajectory");
   this->addProperty("base_frame",base_frame_).doc("The robot frame to track the trajectory");
@@ -44,7 +44,7 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
   this->addProperty("ec_safe",ec_safe_).doc("Min Ec limit");
   this->addProperty("human_min_dist",human_min_dist_).doc("Human minimum distance for ec = ec_safe");
   this->addProperty("human_max_dist",human_max_dist_).doc("Human distance for ec = ec_max");
-  
+
   select_components_.resize(6);
   select_axes_.resize(select_components_.size());
   for(int i = 0; i<select_components_.size() ; i++){
@@ -53,7 +53,7 @@ CartOptCtrl::CartOptCtrl(const std::string& name):RTT::TaskContext(name)
     name = "select_axes_"+ std::to_string(i);
     this->addProperty(name,select_axes_[i]).doc("Selection of the axis to use for the task");
   }
-  
+
   // Service to get current cartesian pose
   this->addOperation("getCurrentPose",&CartOptCtrl::getCurrentPose,this,RTT::ClientThread);
 }
@@ -90,7 +90,7 @@ bool CartOptCtrl::configureHook(){
   joint_torque_out_.resize(dof);
   joint_position_in_.resize(dof);
   joint_velocity_in_.resize(dof);
-  H_.resize(dof,dof);  
+  H_.resize(dof,dof);
   g_.resize(dof);
   a_.resize(6,dof);
   lb_.resize(dof);
@@ -110,7 +110,7 @@ bool CartOptCtrl::configureHook(){
   joint_pos_vel_.positions.resize(dof);
   joint_pos_vel_.velocities.resize(dof);
   viscous_coeffs_.resize(6);
-  
+
   // Matices init
   H_.setZero(dof, dof);
   g_.setZero(dof);
@@ -131,7 +131,7 @@ bool CartOptCtrl::configureHook(){
   KDL::SetToZero(integral_error_);
   viscous_coeffs_.setZero(6);
   xd_curr_filtered_.setZero();
-  
+
   // Default params
   ee_frame_ = arm_.getSegmentName( arm_.getNrOfSegments() - 1 );
   p_gains_ << 1000,1000,1000,1000,1000,1000;
@@ -147,7 +147,7 @@ bool CartOptCtrl::configureHook(){
   damping_weight_  << 1.0,1.0,1.0,1.0,1.0,1.0,1.0;
   cart_min_constraints_.setConstant(3, -10.0);
   cart_max_constraints_.setConstant(3, 10.0);
-  horizon_steps_ = 15.0; 
+  horizon_steps_ = 15.0;
   compensate_gravity_ = true;
   viscous_walls_ = true;
   for(int i = 1; i<select_components_.size() ; i++){
@@ -164,9 +164,9 @@ bool CartOptCtrl::configureHook(){
   human_min_dist_ = 0.15;
   human_max_dist_ = 4;
   distance_to_contact_ = 1000;
-  
-  // Match all properties (defined in the constructor) 
-  // with the rosparams in the namespace : 
+
+  // Match all properties (defined in the constructor)
+  // with the rosparams in the namespace :
   // nameOfThisComponent/nameOftheProperty
   // Equivalent to ros::param::get("CartOptCtrl/p_gains_");
   rtt_ros_kdl_tools::getAllPropertiesFromROSParam(this);
@@ -175,7 +175,7 @@ bool CartOptCtrl::configureHook(){
   int number_of_variables = dof;
   number_of_constraints_ = dof + 3 + 1;
   qpoases_solver_.reset(new qpOASES::SQProblem(number_of_variables,number_of_constraints_,qpOASES::HST_POSDEF));
-  
+
   // QPOases options
   qpOASES::Options options;
   // This options enables regularisation (required) and disable
@@ -186,7 +186,7 @@ bool CartOptCtrl::configureHook(){
   options.enableEqualities = qpOASES::BT_TRUE; // Specifies whether equalities shall be  always treated as active constraints.
   qpoases_solver_->setOptions( options );
   qpoases_solver_->setPrintLevel(qpOASES::PL_NONE); // PL_HIGH for full output, PL_NONE for... none
-  
+
   return true;
 }
 
@@ -194,7 +194,7 @@ bool CartOptCtrl::startHook(){
   // Initialize start values
   has_first_command_ = false;
   button_pressed_ = false;
-  transition_gain_ = 1.0;   
+  transition_gain_ = 1.0;
   return true;
 }
 
@@ -202,18 +202,18 @@ void CartOptCtrl::updateHook(){
   // Read the current state of the robot
   RTT::FlowStatus fp = this->port_joint_position_in_.read(this->joint_position_in_);
   RTT::FlowStatus fv = this->port_joint_velocity_in_.read(this->joint_velocity_in_);
-  
+
   // Return if not giving anything (might happend during startup)
   if(fp == RTT::NoData || fv == RTT::NoData){
-    log(RTT::Error) << "Robot ports empty !" << endlog();
+    //log(RTT::Error) << "Robot ports empty !" << endlog();
     return;
   }
-  
+
   // Feed the internal model
   arm_.setState(this->joint_position_in_,this->joint_velocity_in_);
   // Make some calculations
   arm_.updateModel();
-  
+
   // Get Current end effector Pose
   X_curr_ = arm_.getSegmentPosition(ee_frame_);
   Xd_curr_ = arm_.getSegmentVelocity(ee_frame_);
@@ -221,7 +221,7 @@ void CartOptCtrl::updateHook(){
   // Initialize the desired velocity and acceleration to zero
   KDL::SetToZero(Xd_traj_);
   KDL::SetToZero(Xdd_traj_);
-  
+
   // If we get a new trajectory point to track
   if((port_pnt_pos_in_.read(pt_pos_in_) != RTT::NoData) && (port_pnt_vel_in_.read(pt_vel_in_) != RTT::NoData) && (port_pnt_acc_in_.read(pt_acc_in_) != RTT::NoData)){
     // Then overwrite the desired
@@ -229,34 +229,34 @@ void CartOptCtrl::updateHook(){
     Xd_traj_ = pt_vel_in_;
     Xdd_traj_ = pt_acc_in_;
   }
-  
+
   // First step, initialise the first X,Xd,Xdd desired
   // Stay at the same position
   if(!has_first_command_)
     X_traj_ = X_curr_;
-  
+
   // Compute errors
   X_err_ = diff( X_curr_ , X_traj_ );
   Xd_err_ = diff( Xd_curr_ , Xd_traj_);
-  
+
   // Debug publish current pose in ROS
   tf::poseKDLToMsg(X_traj_,x_des_pos_out_);
   x_des_pos_stamped_out_.pose = x_des_pos_out_;
   x_des_pos_stamped_out_.header.frame_id = base_frame_;
   x_des_pos_stamped_out_.header.stamp = rtt_rosclock::host_now();
   port_x_des_.write(x_des_pos_stamped_out_);
-  
+
   // Debug publish current position and velocity in ROS
   for(int i=0; i< arm_.getNrOfJoints(); i++){
     joint_pos_vel_.positions[i] = joint_position_in_(i);
     joint_pos_vel_.velocities[i] = joint_velocity_in_(i);
   }
   port_joint_pos_vel_in_.write(joint_pos_vel_);
-  
+
   // Debug publish pose error in ROS
   tf::twistKDLToMsg(X_err_, error_twist_ros_);
   port_error_out_.write(error_twist_ros_);
-  
+
   // Saturate the pose error
   for(unsigned int i=0; i<3; ++i ){
     if(X_err_(i) >0)
@@ -270,7 +270,7 @@ void CartOptCtrl::updateHook(){
     else
       X_err_(i) = std::max(-orientation_saturation_, X_err_(i));
   }
-  
+
   // Saturate the integral term
   for(unsigned int i=0; i<3; ++i ){
     if (i_gains_(i) > 0){
@@ -293,13 +293,13 @@ void CartOptCtrl::updateHook(){
     }
     else
       integral_error_(i) = 0;
-  }  
-  
-  // Apply PD 
+  }
+
+  // Apply PD
   for( unsigned int i=0; i<6; ++i )
     Xdd_des_(i) = Xdd_traj_(i) + p_gains_(i) * ( X_err_(i) ) + i_gains_(i) * integral_error_(i) - d_gains_(i) * ( Xd_curr_(i) );
   tf::twistKDLToEigen(Xdd_des_,xdd_des_);
-  
+
   // Update current Matrices and vectors
   J_ = arm_.getSegmentJacobian(ee_frame_);
   M_inv_ = arm_.getInertiaInverseMatrix();
@@ -311,7 +311,7 @@ void CartOptCtrl::updateHook(){
   tf::twistKDLToEigen(Xd_curr_, xd_curr_);
   tf::vectorKDLToEigen(X_curr_.p, x_curr_lin_);
   x_curr_.block(0,0,3,1) = x_curr_lin_;
-  
+
   // We put it in the form ax + b
   // M(q).qdd + B(qd) + G(q) = T
   // --> qdd = Minv.( T - B - G)
@@ -330,38 +330,38 @@ void CartOptCtrl::updateHook(){
   H_ = 2.0 * regularisation_weight_ * M_inv_.data;
   if (compensate_gravity_)
     g_ = - 2.0* (regularisation_weight_ * M_inv_.data * (gravity_.data - damping_weight_.asDiagonal() * joint_velocity_in_));
-  
+
   // Read button press port
   this->port_button_pressed_in_.read(button_pressed_);
-  
+
   // If button is pressed leave only the regularisation task
   // Then progressively introduce the cartesian task
   if (button_pressed_)
     transition_gain_ = 0.0;
   else
     transition_gain_ = std::min(1.0,transition_gain_ + 0.001 * regularisation_weight_);
-  
+
   // Write cartesian tasks
-  // The cartesian tasks can be decoupling by axes  
-  for(int i=0; i<select_components_.size();i++){    
+  // The cartesian tasks can be decoupling by axes
+  for(int i=0; i<select_components_.size();i++){
     a_.noalias() =  J_.data * select_axes_[i].asDiagonal() * M_inv_.data;
     b_.noalias() = (- a_ * ( coriolis_.data + gravity_.data ) + jdot_qdot_ - xdd_des_);
-    
-    H_ += transition_gain_ * 2.0 * a_.transpose() * select_components_[i].asDiagonal() * a_;  
+
+    H_ += transition_gain_ * 2.0 * a_.transpose() * select_components_[i].asDiagonal() * a_;
     g_ += transition_gain_ * 2.0 * a_.transpose() * select_components_[i].asDiagonal() * b_;
-  }  
-  
-  // Torque bounds update 
+  }
+
+  // Torque bounds update
   lb_ = -torque_max_;
-  ub_ = torque_max_;    
-  
+  ub_ = torque_max_;
+
   // Joint velocity bounds update
   qd_max_ = jnt_vel_max_;
   qd_min_ = -jnt_vel_max_;
-  
+
   // Update horizon
   double horizon_dt = horizon_steps_* this->getPeriod();
-  
+
   // Joint position and velocity constraints
   A_.block(0,0,arm_.getNrOfJoints(),arm_.getNrOfJoints()) = M_inv_.data;
 
@@ -369,14 +369,14 @@ void CartOptCtrl::updateHook(){
 //   for( int i; i<arm_.getNrOfJoints(); ++i ){
 //     if( fabs(current_jnt_vel[i]) < 1.0e-12 ) // avoid division by zero, por favor
 //         continue;
-//     
+//
 //     // lower bound
 //     tlim = 2.0*( jnt_pos_limit_lower[i] - current_jnt_pos[i] ) / current_jnt_vel[i];
 //     if( tlim < 1.0e-12 ) //  tlim < 0 is of no interest, and tlim = 0 the problem is undefined
 //         continue;
 //     if( (0 <= tlim) && (tlim <= horizon) )
 //         ddq_lower[i] = fmax( ddq_lower[i], -current_jnt_vel[i] / tlim  ); // ddq >= dq^2 / (2(q-qmin))
-//         
+//
 //     // upper bound
 //     tlim = 2.0*( jnt_pos_limit_upper[i] - current_jnt_pos[i] ) / current_jnt_vel[i];
 //     if( tlim < 1.0e-12 ) //  tlim < 0 is of no interest, and tlim = 0 the problem is undefined
@@ -387,17 +387,17 @@ void CartOptCtrl::updateHook(){
 
   lbA_.block(0,0,arm_.getNrOfJoints(),1) = (( qd_min_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMax(
       2*(arm_.getJointLowerLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms_ );
-  
+
   ubA_.block(0,0,arm_.getNrOfJoints(),1) = (( qd_max_ - joint_velocity_in_ ) / horizon_dt + nonLinearTerms_).cwiseMin(
       2*(arm_.getJointUpperLimit() - joint_position_in_ - joint_velocity_in_ * horizon_dt)/ (horizon_dt*horizon_dt) + nonLinearTerms_ );
-  
+
   // Cartesian position constraints
   A_.block(7,0,3,arm_.getNrOfJoints()) = (J_.data*M_inv_.data).block(0,0,3,arm_.getNrOfJoints());
   x_max_.block(0,0,3,1) = cart_max_constraints_;
   x_min_.block(0,0,3,1) = cart_min_constraints_;
   ubA_.block(7,0,3,1) = (2*(x_max_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
-  lbA_.block(7,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);  
-  
+  lbA_.block(7,0,3,1) = (2*(x_min_ - x_curr_ - horizon_dt * J_.data * joint_velocity_in_)/(horizon_dt*horizon_dt) - jdot_qdot_ + J_.data * nonLinearTerms_).block(0,0,3,1);
+
   // Filter current speed for kinetic energy computation
   if (!has_first_command_)
     xd_curr_filtered_ = xd_curr_;
@@ -405,13 +405,13 @@ void CartOptCtrl::updateHook(){
     for(int i=0; i<6 ; i++)
       xd_curr_filtered_(i) = 0.95 * xd_curr_filtered_(i) + 0.05 * xd_curr_(i);
   }
-  
+
   // Ec current and Ec next
   Lambda_ = (J_.data * M_inv_.data * J_.data.transpose()).inverse();
   delta_x_ = xd_curr_filtered_ * horizon_dt + 0.5 * xdd_des_ * horizon_dt * horizon_dt;
   double ec_curr = 0.5 * xd_curr_filtered_.transpose() * Lambda_ * xd_curr_filtered_;
   double ec_next = ec_curr + delta_x_.transpose() * Lambda_ * (jdot_qdot_ - J_.data * nonLinearTerms_);
-  
+
   // Compute Ec_lim from last_human_pose
   geometry_msgs::PointStamped last_human_pose;
   if (port_human_pos_in_.read(last_human_pose) == RTT::NewData)
@@ -433,12 +433,12 @@ void CartOptCtrl::updateHook(){
   A_.block(10,0,1,arm_.getNrOfJoints()) = delta_x_.transpose() * Lambda_ * J_.data * M_inv_.data;
   ubA_(10) = ec_lim_ - ec_next;
   lbA_(10) = -100000000.0 - ec_next;
-  
+
   // Ec limit stream to ROS
   std_msgs::Float32 ec_msg;
   ec_msg.data = ec_lim_;
   port_ec_lim_out_.write(ec_msg);
-  
+
   // Viscous walls around cartesian constraints
   if(viscous_walls_){
     viscous_coeffs_;
@@ -450,18 +450,18 @@ void CartOptCtrl::updateHook(){
     }
     g_ +=  2.0 * regularisation_weight_ * M_inv_.data *J_.data.transpose() * viscous_coeffs_.asDiagonal() * xd_curr_;
   }
-  
+
   // number of allowed compute steps
-  int nWSR = 1e6; 
-  
+  int nWSR = 1e6;
+
   // Let's compute !
   qpOASES::returnValue ret;
   static bool qpoases_initialized = false;
-  
+
   if(!qpoases_initialized){
     // Initialise the problem, once it has found a solution, we can hotstart
     ret = qpoases_solver_->init(H_.data(),g_.data(),A_.data(),lb_.data(),ub_.data(),lbA_.data(),ubA_.data(),nWSR);
-    
+
     // Keep init if it didn't work
     if(ret == qpOASES::SUCCESSFUL_RETURN)
       qpoases_initialized = true;
@@ -469,15 +469,15 @@ void CartOptCtrl::updateHook(){
   else{
     // Otherwise let's reuse the previous solution to find a solution faster
     ret = qpoases_solver_->hotstart(H_.data(),g_.data(),A_.data(),lb_.data(),ub_.data(),lbA_.data(),ubA_.data(),nWSR);
-      
+
     if(ret != qpOASES::SUCCESSFUL_RETURN)
       qpoases_initialized = false;
   }
-  
+
   // Zero grav if no solution found
   // TODO: find a better alternative
   joint_torque_out_.setZero();
-  
+
   if(ret == qpOASES::SUCCESSFUL_RETURN){
     // Get the solution
     qpoases_solver_->getPrimalSolution(joint_torque_out_.data());

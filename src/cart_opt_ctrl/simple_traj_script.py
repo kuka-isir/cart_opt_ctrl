@@ -4,6 +4,7 @@
 import sys
 import copy
 import rospy
+import tf
 from geometry_msgs.msg import PoseArray, Pose
 from cart_opt_ctrl.srv import UpdateWaypoints, UpdateWaypointsRequest, GetCurrentPose, GetCurrentPoseRequest, GetCurrentPoseResponse
 
@@ -20,18 +21,24 @@ def main(argv):
     exit(0)
 
   waypoints = PoseArray()
-  waypoints.header.frame_id = "base_link"
-  
+  waypoints.header.frame_id = rospy.get_param("root_link")
+
   waypoints.poses.append(resp.current_pose)
-  
+
   pose = Pose()
   pose.position.x = 0.4
   pose.position.y = 0.0
   pose.position.z = 0.4
-  pose.orientation.x = 1.0
-  pose.orientation.y = 0.0
-  pose.orientation.z = 0.0
-  pose.orientation.w = 0.0
+
+  roll = 0.0
+  pitch = 0.0
+  yaw = -1.57
+  quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
+  pose.orientation.x = quaternion[0]
+  pose.orientation.y = quaternion[1]
+  pose.orientation.z = quaternion[2]
+  pose.orientation.w = quaternion[3]
+
   waypoints.poses.append(pose)
 
   client = rospy.ServiceProxy('/KDLTrajCompute/updateWaypoints', UpdateWaypoints)

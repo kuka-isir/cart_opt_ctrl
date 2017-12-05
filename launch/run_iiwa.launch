@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<launch>
+
+  <!--============ LWR Runner script Params ========-->
+
+  <!-- The end effector frame (you'll be able to use frames <= tip_link for cartesian position, jacobians etc.) -->
+  <arg name="tip_link" default="iiwa_link_ee"/>
+  <!-- The root_link will be frame used for sending goals to the cartesian controller -->
+  <arg name="root_link" default="iiwa_link_0"/>
+  <!-- Run Simulated robot (need to 'roslaunch rtt_lwr_gazebo lwr_gazebo.launch' first) -->
+  <arg name="sim" default="false" />
+  <!-- Run in GDB -->
+  <arg name="debug" default="false" />
+  <!-- Launch rviz -->
+  <arg name="rviz" default="false" />
+  <!-- The level of verbose (never, fatal, critical, error, warning, info, debug, realtime) -->
+  <arg name="log_level" default="error" />
+  <!-- Tools -->
+  <!-- <arg name="load_base" default="true" />
+  <arg name="load_table" default="true" />
+  <arg name="load_laser" default="false" />
+  <arg name="load_ati_sensor" default="true" />
+  <arg name="load_weight" default="false" />
+  <arg name="load_handle" default="true" />
+  <arg name="load_calib_tool" default="false" /> -->
+  <!-- Gazebo -->
+  <arg name="gazebo_gui" default="false"/>
+
+
+ <!--============ CartOptCtrl Params ============-->
+ <rosparam ns="CartOptCtrl" subst_value="true">
+    frame_of_interest : $(arg tip_link)
+    base_frame : $(arg root_link)
+
+    torque_max : [160.0, 160.0, 85.0, 85.0, 85.0, 28.0, 28.0]
+    joint_vel_max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+    <!--PID-->
+
+    p_gains : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
+    i_gains : [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    d_gains : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
+
+
+    X_target : 0.55656
+    Y_target : 0
+    Z_target : 0.0
+
+    position_saturation : 0.02
+    orientation_saturation : 0.03
+    position_saturation : 0.1
+    orientation_saturation : 0.1
+
+    Ec_lim : 0.25
+    F_lim : 50
+    horizon : 15
+    regularisation_weight : 0.000001
+
+    start_pointing : false
+
+    compensate_gravity : true
+    damping_weight : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+</rosparam>
+
+<!--============ KDLTrajCompute Params ============-->
+<rosparam ns="KDLTrajCompute" subst_value="true">
+  vel_max : 0.1
+  acc_max : 0.5
+  radius : 0.01
+  eqradius : 0.05
+  base_frame : $(arg root_link)
+</rosparam>
+
+  <!--============ IIWA Runner script ===============-->
+  <include file="$(find iiwa_description)/launch/iiwa7_upload.launch">
+      <!-- <arg name="load_base" value="$(arg load_base)" />
+      <arg name="load_table" value="$(arg load_table)" />
+      <arg name="load_weight" value="$(arg load_weight)" />
+      <arg name="load_laser" value="$(arg load_laser)" />
+      <arg name="load_ati_sensor" value="$(arg load_ati_sensor)" />
+      <arg name="load_calib_tool" value="$(arg load_calib_tool)" />
+      <arg name="load_handle" value="$(arg load_handle)" /> -->
+  </include>
+
+  <include file="$(find rtt_robot_launcher)/launch/run_global.launch">
+    <arg name="sim" value="$(arg sim)" />
+    <arg name="ops_script" value="$(find cart_opt_ctrl)/scripts/run_iiwa.ops"/>
+    <arg name="debug" value="$(arg debug)" />
+    <arg name="log_level" value="$(arg log_level)" />
+    <arg name="tip_link" value="$(arg tip_link)"/>
+    <arg name="root_link" value="$(arg root_link)"/>
+    <arg name="robot_name" value="iiwa"/>
+    <arg name="gazebo_gui" value="$(arg gazebo_gui)"/>
+  </include>
+
+</launch>
