@@ -32,12 +32,12 @@
     frame_of_interest : $(arg tip_link)
     base_frame : $(arg root_link)
 
-    torque_max : [160.0, 160.0, 85.0, 85.0, 85.0, 28.0, 28.0]
+    torque_max : [160.0, 160.0, 100.0, 100.0, 100.0, 28.0, 28.0]
     joint_vel_max : [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
     <!--PID-->
 
-    p_gains : [1080.0, 1080.0, 1080.0, 1080.0, 1080.0, 1080.0]
+    p_gains : [1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0]
     i_gains : [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     d_gains : [22.0, 22.0, 22.0, 22.0, 22.0, 22.0]
 
@@ -64,7 +64,7 @@
 
 <!--============ KDLTrajCompute Params ============-->
 <rosparam ns="KDLTrajCompute" subst_value="true">
-  vel_max : 0.1
+  vel_max : 0.01
   acc_max : 0.5
   radius : 0.01
   eqradius : 0.05

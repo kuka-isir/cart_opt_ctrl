@@ -30,9 +30,9 @@ def main(argv):
   pose.position.y = 0.0
   pose.position.z = 0.4
 
-  roll = 0.0
+  roll = -3.1416
   pitch = 0.0
-  yaw = -1.57
+  yaw = 0.0
   quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
   pose.orientation.x = quaternion[0]
   pose.orientation.y = quaternion[1]
